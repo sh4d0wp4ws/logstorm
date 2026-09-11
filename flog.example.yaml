@@ -1,0 +1,14 @@
+streams:
+  - name: apache-udp
+    format: apache_common
+    type: udp
+    target: 192.168.1.10:514
+    number: 100
+    delay: 1s
+
+  - name: apache-tcp
+    format: apache_combined
+    type: tcp
+    target: 192.168.1.10:515
+    number: 100
+    delay: 1s

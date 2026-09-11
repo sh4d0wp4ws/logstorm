@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,4 +143,30 @@ func TestParseOptions(t *testing.T) {
 
 	option := ParseOptions()
 	a.Equal(defaultOptions(), option, "without flags, option should be default one")
+}
+
+func TestParseOptionsConfigFlagHelper(t *testing.T) {
+	args := os.Getenv("FLOG_PARSE_OPTIONS_ARGS")
+	if args == "" {
+		return
+	}
+	os.Args = append([]string{os.Args[0]}, strings.Split(args, "|")...)
+	ParseOptions()
+}
+
+func TestParseOptionsAllowsConfigWithoutSingleStreamFlags(t *testing.T) {
+	command := exec.Command(os.Args[0], "-test.run=^TestParseOptionsConfigFlagHelper$")
+	command.Env = append(os.Environ(), "FLOG_PARSE_OPTIONS_ARGS=--config|flog.yaml")
+
+	output, err := command.CombinedOutput()
+	assert.NoError(t, err, string(output))
+}
+
+func TestParseOptionsRejectsSplitByWithConfig(t *testing.T) {
+	command := exec.Command(os.Args[0], "-test.run=^TestParseOptionsConfigFlagHelper$")
+	command.Env = append(os.Environ(), "FLOG_PARSE_OPTIONS_ARGS=--config|flog.yaml|--split-by|10")
+
+	output, err := command.CombinedOutput()
+	assert.Error(t, err)
+	assert.Contains(t, string(output), "--config cannot be used with --split-by")
 }

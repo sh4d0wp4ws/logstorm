@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +17,41 @@ import (
 type closeErrorWriter struct {
 	closeCalls int
 	closeErr   error
+}
+
+type writeCloseErrorWriter struct {
+	writeErr   error
+	closeErr   error
+	closeCalls int
+}
+
+type blockingWriter struct {
+	writeStarted chan struct{}
+	writeRelease chan struct{}
+	closeCalled  chan struct{}
+	closeOnce    sync.Once
+}
+
+func (writer *blockingWriter) Write(data []byte) (int, error) {
+	close(writer.writeStarted)
+	<-writer.writeRelease
+	return len(data), nil
+}
+
+func (writer *blockingWriter) Close() error {
+	writer.closeOnce.Do(func() {
+		close(writer.closeCalled)
+	})
+	return nil
+}
+
+func (writer *writeCloseErrorWriter) Write([]byte) (int, error) {
+	return 0, writer.writeErr
+}
+
+func (writer *writeCloseErrorWriter) Close() error {
+	writer.closeCalls++
+	return writer.closeErr
 }
 
 func (writer *closeErrorWriter) Write(data []byte) (int, error) {
@@ -99,4 +136,54 @@ func TestGenerateDoesNotCloseWriterTwiceWhenByteSplitCloseFails(t *testing.T) {
 
 	a.Equal(closeErr, err)
 	a.Equal(1, writer.closeCalls)
+}
+
+func TestGeneratePreservesWriteErrorWhenCloseFails(t *testing.T) {
+	a := assert.New(t)
+	writeErr := errors.New("write failed")
+	writer := &writeCloseErrorWriter{writeErr: writeErr, closeErr: errors.New("close failed")}
+
+	monkey.Patch(NewWriter, func(string, string, string) (io.WriteCloser, error) {
+		return writer, nil
+	})
+	defer monkey.Unpatch(NewWriter)
+
+	err := Generate(&Option{Format: "apache_common", Type: "log", Number: 1})
+
+	a.Equal(writeErr, err)
+	a.Equal(1, writer.closeCalls)
+}
+
+func TestGenerateContextDoesNotCloseFileWriterDuringWrite(t *testing.T) {
+	a := assert.New(t)
+	writer := &blockingWriter{writeStarted: make(chan struct{}), writeRelease: make(chan struct{}), closeCalled: make(chan struct{})}
+
+	monkey.Patch(NewWriter, func(string, string, string) (io.WriteCloser, error) {
+		return writer, nil
+	})
+	defer monkey.Unpatch(NewWriter)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- GenerateContext(ctx, &Option{Format: "apache_common", Type: "log", Number: 1})
+	}()
+
+	<-writer.writeStarted
+	cancel()
+	select {
+	case <-writer.closeCalled:
+		t.Fatal("file writer was closed while Write was blocked")
+	case <-time.After(50 * time.Millisecond):
+	case <-done:
+		t.Fatal("generation completed before the blocked write was released")
+	}
+	close(writer.writeRelease)
+	a.NoError(<-done)
+	select {
+	case <-writer.closeCalled:
+	case <-time.After(time.Second):
+		t.Fatal("file writer was not closed after generation completed")
+	}
 }

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -9,7 +11,11 @@ import (
 )
 
 // Generate generates the logs with given options
-func Generate(option *Option) (err error) {
+func Generate(option *Option) error {
+	return GenerateContext(context.Background(), option)
+}
+
+func GenerateContext(ctx context.Context, option *Option) (err error) {
 	var (
 		splitCount = 1
 		created    = time.Now()
@@ -27,12 +33,21 @@ func Generate(option *Option) (err error) {
 	}
 
 	logFileName := option.Output
-	writer, err := NewWriter(option.Type, logFileName, option.Target)
+	writer, err := NewWriterContext(ctx, option.Type, logFileName, option.Target)
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return err
 	}
 	if option.Type != "stdout" {
+		writer = &closeOnceWriter{WriteCloser: writer}
+		stopCancellationClose := func() {}
+		if isNetworkOutput(option.Type) {
+			stopCancellationClose = closeOnCancellation(ctx, writer)
+		}
 		defer func() {
+			stopCancellationClose()
 			if writer == nil {
 				return
 			}
@@ -47,9 +62,14 @@ func Generate(option *Option) (err error) {
 
 	if option.Forever {
 		for {
-			time.Sleep(delay)
+			if err := waitForDelay(ctx, delay); err != nil {
+				return err
+			}
 			log := NewLog(option.Format, created)
 			if _, err := writer.Write([]byte(log + "\n")); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				return err
 			}
 			created = created.Add(interval)
@@ -59,9 +79,14 @@ func Generate(option *Option) (err error) {
 	if option.Bytes == 0 {
 		// Generates the logs until the certain number of lines is reached
 		for line := 0; line < option.Number; line++ {
-			time.Sleep(delay)
+			if err := waitForDelay(ctx, delay); err != nil {
+				return err
+			}
 			log := NewLog(option.Format, created)
 			if _, err := writer.Write([]byte(log + "\n")); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				return err
 			}
 
@@ -74,11 +99,11 @@ func Generate(option *Option) (err error) {
 				fmt.Println(logFileName, "is created.")
 
 				logFileName = NewSplitFileName(option.Output, splitCount)
-				newWriter, err := NewWriter(option.Type, logFileName, option.Target)
+				newWriter, err := NewWriterContext(ctx, option.Type, logFileName, option.Target)
 				if err != nil {
 					return err
 				}
-				writer = newWriter
+				writer = &closeOnceWriter{WriteCloser: newWriter}
 
 				splitCount++
 			}
@@ -88,9 +113,14 @@ func Generate(option *Option) (err error) {
 		// Generates the logs until the certain size in bytes is reached
 		bytes := 0
 		for bytes < option.Bytes {
-			time.Sleep(delay)
+			if err := waitForDelay(ctx, delay); err != nil {
+				return err
+			}
 			log := NewLog(option.Format, created)
 			if _, err := writer.Write([]byte(log + "\n")); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				return err
 			}
 
@@ -104,11 +134,11 @@ func Generate(option *Option) (err error) {
 				fmt.Println(logFileName, "is created.")
 
 				logFileName = NewSplitFileName(option.Output, splitCount)
-				newWriter, err := NewWriter(option.Type, logFileName, option.Target)
+				newWriter, err := NewWriterContext(ctx, option.Type, logFileName, option.Target)
 				if err != nil {
 					return err
 				}
-				writer = newWriter
+				writer = &closeOnceWriter{WriteCloser: newWriter}
 
 				splitCount++
 			}
@@ -117,6 +147,43 @@ func Generate(option *Option) (err error) {
 	}
 
 	return nil
+}
+
+func waitForDelay(ctx context.Context, delay time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if delay == 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func closeOnCancellation(ctx context.Context, writer io.WriteCloser) func() {
+	if ctx.Done() == nil {
+		return func() {}
+	}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		select {
+		case <-ctx.Done():
+			_ = writer.Close()
+		case <-stop:
+		}
+	}()
+	return func() {
+		close(stop)
+		<-done
+	}
 }
 
 // NewLog creates a log for given format
