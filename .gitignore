@@ -9,3 +9,7 @@ flog.exe
 # Editors
 .idea/
 .vscode/
+
+# Config
+flog.yaml
+*.local.yaml
