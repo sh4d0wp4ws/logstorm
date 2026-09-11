@@ -4,6 +4,7 @@ vendor/
 # Build & binary
 dist/
 flog
+flog.exe
 
 # Editors
 .idea/
