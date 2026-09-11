@@ -47,10 +47,13 @@ Options:
                            - rfc5424
                            - json
   -o, --output string      output filename. Path-like is allowed. (default "generated.log")
+      --target string      network destination in host:port form. Required for tcp and udp output.
   -t, --type string        log output type. available types:
                            - stdout (default)
                            - log
                            - gz
+                           - tcp
+                           - udp
   -n, --number integer     number of lines to generate.
   -b, --bytes integer      size of logs to generate (in bytes).
                            "bytes" will be ignored when "number" is set.
@@ -83,7 +86,36 @@ $ flog -t log -f apache_combined -o web/log/apache.log -b 10485760 -p 1048576
 
 # Generate logs in rfc3164 format infinitely until killed
 $ flog -f rfc3164 -l
+
 ```
+
+## Network Output
+
+Use `-t tcp` or `-t udp` with `--target host:port`. A flog process sends one log format to one output and one target.
+
+```console
+# Send Apache common logs to a UDP destination
+$ flog -f apache_common -t udp --target 192.168.1.10:514
+
+# Send Apache combined logs to a TCP destination
+$ flog -f apache_combined -t tcp --target 192.168.1.10:515
+
+# Generate RFC3164 logs continuously over UDP
+$ flog -f rfc3164 -t udp --target 192.168.1.10:514 --loop
+```
+
+TCP opens one connection and reuses it for all generated logs. Messages are currently newline-delimited. UDP sends one generated log, including its newline, per datagram.
+
+### rsyslog imtcp
+
+For raw TCP logs, configure rsyslog without octet-counted framing:
+
+```conf
+module(load="imtcp")
+input(type="imtcp" port="515" supportOctetCountedFraming="off")
+```
+
+This is important for logs that start with digits, such as Apache access logs beginning with an IP address; otherwise rsyslog may interpret the leading digits as an octet-counted frame length.
 
 ## Supported Formats
 
@@ -100,6 +132,8 @@ $ flog -f rfc3164 -l
 - Stdout
 - File
 - Gzip
+- TCP
+- UDP
 
 ## License
 

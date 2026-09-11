@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"testing"
 	"time"
@@ -9,6 +11,20 @@ import (
 	"bou.ke/monkey"
 	"github.com/stretchr/testify/assert"
 )
+
+type closeErrorWriter struct {
+	closeCalls int
+	closeErr   error
+}
+
+func (writer *closeErrorWriter) Write(data []byte) (int, error) {
+	return len(data), nil
+}
+
+func (writer *closeErrorWriter) Close() error {
+	writer.closeCalls++
+	return writer.closeErr
+}
 
 func ExampleNewLog() {
 	rand.Seed(11)
@@ -41,4 +57,46 @@ func TestNewSplitFileName(t *testing.T) {
 
 	splitFileName := NewSplitFileName("/path/to/file/generated.log", 1)
 	a.Equal("/path/to/file/generated1.log", splitFileName, "filename should be '/path/to/file/generated1.log'")
+}
+
+func TestGenerateDoesNotCloseWriterTwiceWhenLineSplitCloseFails(t *testing.T) {
+	a := assert.New(t)
+	closeErr := errors.New("close failed")
+	writer := &closeErrorWriter{closeErr: closeErr}
+
+	monkey.Patch(NewWriter, func(string, string, string) (io.WriteCloser, error) {
+		return writer, nil
+	})
+	defer monkey.Unpatch(NewWriter)
+
+	err := Generate(&Option{
+		Format:  "apache_common",
+		Type:    "log",
+		Number:  3,
+		SplitBy: 1,
+	})
+
+	a.Equal(closeErr, err)
+	a.Equal(1, writer.closeCalls)
+}
+
+func TestGenerateDoesNotCloseWriterTwiceWhenByteSplitCloseFails(t *testing.T) {
+	a := assert.New(t)
+	closeErr := errors.New("close failed")
+	writer := &closeErrorWriter{closeErr: closeErr}
+
+	monkey.Patch(NewWriter, func(string, string, string) (io.WriteCloser, error) {
+		return writer, nil
+	})
+	defer monkey.Unpatch(NewWriter)
+
+	err := Generate(&Option{
+		Format:  "apache_common",
+		Type:    "log",
+		Bytes:   1,
+		SplitBy: 1,
+	})
+
+	a.Equal(closeErr, err)
+	a.Equal(1, writer.closeCalls)
 }

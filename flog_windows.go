@@ -8,6 +8,10 @@ import (
 
 // Run checks overwrite flag and generates logs with given options
 func Run(option *Option) error {
+	if !isFileOutput(option.Type) {
+		return Generate(option)
+	}
+
 	logDir := filepath.Dir(option.Output)
 	if err := os.MkdirAll(logDir, 0766); err != nil {
 		return err

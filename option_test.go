@@ -103,6 +103,38 @@ func TestParseSplitBy(t *testing.T) {
 	a.Error(err, "there should be an error when negative is given")
 }
 
+func TestParseTarget(t *testing.T) {
+	a := assert.New(t)
+
+	target, err := ParseTarget("tcp", "localhost:0")
+	a.Equal("localhost:0", target)
+	a.NoError(err)
+
+	target, err = ParseTarget("udp", "127.0.0.1:0")
+	a.Equal("127.0.0.1:0", target)
+	a.NoError(err)
+
+	target, err = ParseTarget("tcp", "")
+	a.Equal("", target)
+	a.Error(err)
+
+	target, err = ParseTarget("udp", " ")
+	a.Equal("", target)
+	a.Error(err)
+
+	target, err = ParseTarget("stdout", "")
+	a.Equal("", target)
+	a.NoError(err)
+
+	target, err = ParseTarget("log", "")
+	a.Equal("", target)
+	a.NoError(err)
+
+	target, err = ParseTarget("gz", "")
+	a.Equal("", target)
+	a.NoError(err)
+}
+
 func TestParseOptions(t *testing.T) {
 	a := assert.New(t)
 

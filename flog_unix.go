@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package main
@@ -11,6 +12,10 @@ import (
 
 // Run checks overwrite flag and generates logs with given options
 func Run(option *Option) error {
+	if !isFileOutput(option.Type) {
+		return Generate(option)
+	}
+
 	logDir := filepath.Dir(option.Output)
 	oldMask := syscall.Umask(0000)
 	if err := os.MkdirAll(logDir, 0766); err != nil {

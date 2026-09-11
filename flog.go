@@ -1,10 +1,7 @@
 package main
 
 import (
-	"compress/gzip"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -12,7 +9,7 @@ import (
 )
 
 // Generate generates the logs with given options
-func Generate(option *Option) error {
+func Generate(option *Option) (err error) {
 	var (
 		splitCount = 1
 		created    = time.Now()
@@ -30,16 +27,31 @@ func Generate(option *Option) error {
 	}
 
 	logFileName := option.Output
-	writer, err := NewWriter(option.Type, logFileName)
+	writer, err := NewWriter(option.Type, logFileName, option.Target)
 	if err != nil {
 		return err
+	}
+	if option.Type != "stdout" {
+		defer func() {
+			if writer == nil {
+				return
+			}
+			if closeErr := writer.Close(); err == nil && closeErr != nil {
+				err = closeErr
+			}
+			if err == nil && isFileOutput(option.Type) {
+				fmt.Println(logFileName, "is created.")
+			}
+		}()
 	}
 
 	if option.Forever {
 		for {
 			time.Sleep(delay)
 			log := NewLog(option.Format, created)
-			_, _ = writer.Write([]byte(log + "\n"))
+			if _, err := writer.Write([]byte(log + "\n")); err != nil {
+				return err
+			}
 			created = created.Add(interval)
 		}
 	}
@@ -49,14 +61,24 @@ func Generate(option *Option) error {
 		for line := 0; line < option.Number; line++ {
 			time.Sleep(delay)
 			log := NewLog(option.Format, created)
-			_, _ = writer.Write([]byte(log + "\n"))
+			if _, err := writer.Write([]byte(log + "\n")); err != nil {
+				return err
+			}
 
-			if (option.Type != "stdout") && (option.SplitBy > 0) && (line > option.SplitBy*splitCount) {
-				_ = writer.Close()
+			if isFileOutput(option.Type) && (option.SplitBy > 0) && (line > option.SplitBy*splitCount) {
+				writerToClose := writer
+				writer = nil
+				if err := writerToClose.Close(); err != nil {
+					return err
+				}
 				fmt.Println(logFileName, "is created.")
 
 				logFileName = NewSplitFileName(option.Output, splitCount)
-				writer, _ = NewWriter(option.Type, logFileName)
+				newWriter, err := NewWriter(option.Type, logFileName, option.Target)
+				if err != nil {
+					return err
+				}
+				writer = newWriter
 
 				splitCount++
 			}
@@ -68,15 +90,25 @@ func Generate(option *Option) error {
 		for bytes < option.Bytes {
 			time.Sleep(delay)
 			log := NewLog(option.Format, created)
-			_, _ = writer.Write([]byte(log + "\n"))
+			if _, err := writer.Write([]byte(log + "\n")); err != nil {
+				return err
+			}
 
 			bytes += len(log)
-			if (option.Type != "stdout") && (option.SplitBy > 0) && (bytes > option.SplitBy*splitCount+1) {
-				_ = writer.Close()
+			if isFileOutput(option.Type) && (option.SplitBy > 0) && (bytes > option.SplitBy*splitCount+1) {
+				writerToClose := writer
+				writer = nil
+				if err := writerToClose.Close(); err != nil {
+					return err
+				}
 				fmt.Println(logFileName, "is created.")
 
 				logFileName = NewSplitFileName(option.Output, splitCount)
-				writer, _ = NewWriter(option.Type, logFileName)
+				newWriter, err := NewWriter(option.Type, logFileName, option.Target)
+				if err != nil {
+					return err
+				}
+				writer = newWriter
 
 				splitCount++
 			}
@@ -84,33 +116,7 @@ func Generate(option *Option) error {
 		}
 	}
 
-	if option.Type != "stdout" {
-		_ = writer.Close()
-		fmt.Println(logFileName, "is created.")
-	}
 	return nil
-}
-
-// NewWriter returns a closeable writer corresponding to given log type
-func NewWriter(logType string, logFileName string) (io.WriteCloser, error) {
-	switch logType {
-	case "stdout":
-		return os.Stdout, nil
-	case "log":
-		logFile, err := os.Create(logFileName)
-		if err != nil {
-			return nil, err
-		}
-		return logFile, nil
-	case "gz":
-		logFile, err := os.Create(logFileName)
-		if err != nil {
-			return nil, err
-		}
-		return gzip.NewWriter(logFile), nil
-	default:
-		return nil, nil
-	}
 }
 
 // NewLog creates a log for given format

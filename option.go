@@ -46,12 +46,13 @@ Options:
 `
 
 var validFormats = []string{"apache_common", "apache_combined", "apache_error", "rfc3164", "rfc5424", "common_log", "json"}
-var validTypes = []string{"stdout", "log", "gz"}
+var validTypes = []string{"stdout", "log", "gz", "tcp", "udp"}
 
 // Option defines log generator options
 type Option struct {
 	Format    string
 	Output    string
+	Target    string
 	Type      string
 	Number    int
 	Bytes     int
@@ -83,6 +84,7 @@ func defaultOptions() *Option {
 	return &Option{
 		Format:    "apache_common",
 		Output:    "generated.log",
+		Target:    "",
 		Type:      "stdout",
 		Number:    1000,
 		Bytes:     0,
@@ -108,6 +110,14 @@ func ParseType(logType string) (string, error) {
 		return "", fmt.Errorf("%s is not a valid log type", logType)
 	}
 	return logType, nil
+}
+
+func ParseTarget(logType string, target string) (string, error) {
+	target = strings.TrimSpace(target)
+	if isNetworkOutput(logType) && target == "" {
+		return "", errors.New("target is required for tcp and udp output")
+	}
+	return target, nil
 }
 
 // ParseNumber validates the given number
@@ -174,6 +184,7 @@ func ParseOptions() *Option {
 	version := pflag.BoolP("version", "v", false, "Show version")
 	format := pflag.StringP("format", "f", opts.Format, "Log format")
 	output := pflag.StringP("output", "o", opts.Output, "Path-like output filename")
+	target := pflag.String("target", opts.Target, "Network destination in host:port form")
 	logType := pflag.StringP("type", "t", opts.Type, "Log output type")
 	number := pflag.IntP("number", "n", opts.Number, "Number of lines to generate")
 	bytes := pflag.IntP("bytes", "b", opts.Bytes, "Size of logs to generate. (in bytes)")
@@ -199,6 +210,9 @@ func ParseOptions() *Option {
 	if opts.Type, err = ParseType(*logType); err != nil {
 		errorExit(err)
 	}
+	if opts.Target, err = ParseTarget(opts.Type, *target); err != nil {
+		errorExit(err)
+	}
 	if opts.Number, err = ParseNumber(*number); err != nil {
 		errorExit(err)
 	}
@@ -218,4 +232,12 @@ func ParseOptions() *Option {
 	opts.Overwrite = *overwrite
 	opts.Forever = *forever
 	return opts
+}
+
+func isNetworkOutput(logType string) bool {
+	return logType == "tcp" || logType == "udp"
+}
+
+func isFileOutput(logType string) bool {
+	return logType == "log" || logType == "gz"
 }
