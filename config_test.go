@@ -88,6 +88,27 @@ streams:
 	assert.Equal(t, "udp", streams[0].Option.Type)
 }
 
+func TestLoadStreamsAcceptsCEF(t *testing.T) {
+	streams, err := LoadStreams(writeConfig(t, `
+streams:
+  - name: cef-udp
+    format: cef
+    type: udp
+    target: localhost:514
+  - name: cef-tcp
+    format: cef
+    type: tcp
+    target: localhost:515
+`))
+	if !assert.NoError(t, err) || !assert.Len(t, streams, 2) {
+		return
+	}
+	for _, stream := range streams {
+		assert.Equal(t, "cef", stream.Option.Format)
+		assert.NotEmpty(t, NewLog(stream.Option.Format, stopped))
+	}
+}
+
 func TestLoadStreamsRejectsInvalidConfiguration(t *testing.T) {
 	tests := []struct {
 		name    string

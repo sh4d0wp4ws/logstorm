@@ -174,7 +174,7 @@ Do not create a separate `tests/` directory unless the project architecture late
 
 Current TCP behavior is:
 
-- one target per `flog` process
+- one target per stream (one stream in single-stream CLI mode)
 - one TCP connection is opened for the generation run
 - the same connection is reused for generated logs
 - messages are newline-delimited
@@ -190,7 +190,7 @@ Do not reconnect for every generated log.
 
 Current UDP behavior is:
 
-- one target per `flog` process
+- one target per stream (one stream in single-stream CLI mode)
 - one UDP socket/connected UDP writer is used for the generation run
 - each generated log is written as one UDP datagram
 - UDP delivery is not guaranteed
@@ -216,7 +216,7 @@ Do not add TCP framing modes unless they are explicitly requested as a separate 
 
 ## Current Scope and Limitations
 
-The current execution model is:
+The single-stream CLI execution model is:
 
 ```text
 one flog process
@@ -228,9 +228,10 @@ one output type
 one destination
 ```
 
+Optional `--config` YAML configuration runs concurrent TCP/UDP streams. Each stream has one format, one output type, and one destination.
+
 Do not document or assume the following as implemented unless the source code actually contains them:
 
-- multi-stream configuration
 - multiple destinations per stream
 - automatic TCP reconnect
 - retry/backoff

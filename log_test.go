@@ -62,7 +62,7 @@ func ExampleNewRFC5424Log() {
 
 	created := time.Now()
 	fmt.Println(NewRFC5424Log(created))
-	// Output: <24>3 2018-04-22T09:30:00.000Z futurefunctionalities.biz nisi 9030 ID160 - If we back up the program, we can get to the SSL sensor through the redundant SAS program!
+	// Output: <24>1 2018-04-22T09:30:00.000Z nationalseamless.net quidem 1306 ID30 - I'Ll reboot the auxiliary USB protocol, that should sensor the SAS capacitor!
 }
 
 func ExampleNewCommonLogFormat() {

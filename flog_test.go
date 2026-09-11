@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"bou.ke/monkey"
+	"github.com/brianvoe/gofakeit"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,7 +86,7 @@ func ExampleNewLog() {
 	// 144.199.149.125 - waelchi7603 [22/Apr/2018:09:30:00 +0000] "PUT /revolutionary HTTP/1.1" 301 8089 "https://www.futureaggregate.io/users" "Mozilla/5.0 (Macintosh; PPC Mac OS X 10_6_5 rv:4.0; en-US) AppleWebKit/536.38.2 (KHTML, like Gecko) Version/6.0 Safari/536.38.2"
 	// [Sun Apr 22 09:30:00 2018] [eaque:error] [pid 3748:tid 2783] [client 54.26.161.221:31944] Backing up the program won't do anything, we need to compress the optical PCI bandwidth!
 	// <94>Apr 22 09:30:00 ortiz5384 vel[1775]: If we copy the firewall, we can get to the PCI firewall through the redundant SQL port!
-	// <23>3 2018-04-22T09:30:00.000Z humaniterate.io iusto 544 ID177 - Use the optical RAM hard drive, then you can program the auxiliary feed!
+	// <23>1 2018-04-22T09:30:00.000Z leaditerate.info ducimus 7981 ID544 - If we quantify the circuit, we can get to the RAM hard drive through the optical PNG feed!
 	// 195.44.200.155 - kihn6187 [22/Apr/2018:09:30:00 +0000] "GET /revolutionary/e-markets/holistic/syndicate HTTP/2.0" 404 14503
 	//
 	// {"host":"13.108.182.26", "user-identifier":"bailey7205", "datetime":"22/Apr/2018:09:30:00 +0000", "method": "GET", "request": "/out-of-the-box/architectures/embrace", "protocol":"HTTP/1.0", "status":200, "bytes":5921, "referer": "http://www.dynamicexperiences.io/robust"}
@@ -94,6 +97,30 @@ func TestNewSplitFileName(t *testing.T) {
 
 	splitFileName := NewSplitFileName("/path/to/file/generated.log", 1)
 	a.Equal("/path/to/file/generated1.log", splitFileName, "filename should be '/path/to/file/generated1.log'")
+}
+
+func TestGenerateRFC3164UDPPacketBudgetIncludesLF(t *testing.T) {
+	monkey.Patch(gofakeit.HackerPhrase, func() string { return strings.Repeat("X", 2048) })
+	defer monkey.Unpatch(gofakeit.HackerPhrase)
+	listener, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	if err := listener.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := GenerateContext(context.Background(), &Option{Format: "rfc3164", Type: "udp", Target: listener.LocalAddr().String(), Number: 1}); err != nil {
+		t.Fatal(err)
+	}
+	packet := make([]byte, 4096)
+	n, _, err := listener.ReadFrom(packet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1024 || packet[n-1] != '\n' || strings.ContainsAny(string(packet[:n-1]), "\r\n") {
+		t.Fatalf("expected exactly 1024 bytes including one terminal LF, got %d: %q", n, packet[:n])
+	}
 }
 
 func TestGenerateDoesNotCloseWriterTwiceWhenLineSplitCloseFails(t *testing.T) {

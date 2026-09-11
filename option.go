@@ -25,6 +25,7 @@ Options:
                            - apache_error
                            - rfc3164
                            - rfc5424
+                           - cef (CEF:0 over RFC5424)
                            - json
   -o, --output string      output filename. Path-like is allowed. (default "generated.log")
   -t, --type string        log output type. available types:
@@ -49,7 +50,7 @@ Options:
   -l, --loop               loop output forever until killed.
 `
 
-var validFormats = []string{"apache_common", "apache_combined", "apache_error", "rfc3164", "rfc5424", "common_log", "json"}
+var validFormats = []string{"apache_common", "apache_combined", "apache_error", "rfc3164", "rfc5424", "cef", "common_log", "json"}
 var validTypes = []string{"stdout", "log", "gz", "tcp", "udp"}
 
 // Option defines log generator options

@@ -17,6 +17,10 @@ func TestParseFormat(t *testing.T) {
 	a.Equal("apache_common", format, "format should be apache_common")
 	a.NoError(err, "there should be no error")
 
+	format, err = ParseFormat("cef")
+	a.Equal("cef", format)
+	a.NoError(err)
+
 	format, err = ParseFormat("unknown")
 	a.Equal("", format, "format should be empty string when invalid format is given")
 	a.Error(err, "there should be an error when invalid format is given")

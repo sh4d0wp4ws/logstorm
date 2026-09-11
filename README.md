@@ -25,8 +25,26 @@ Use it to produce a selected log format for stdout, a file, a gzip file, or one 
 - `apache_error`
 - `rfc3164`
 - `rfc5424`
+- `cef` (CEF:0 over RFC5424)
 - `common_log`
 - `json`
+
+### Syslog and CEF
+
+- `rfc3164` uses a local timestamp such as `Apr  7 09:30:00`, a hostname without a domain suffix, and an alphanumeric TAG of at most 32 characters. Content is visible ASCII; only the content is truncated when needed. The body is limited to 1023 bytes, reserving one byte for the existing terminal LF so a UDP datagram is at most 1024 bytes.
+- `rfc5424` uses VERSION `1`, bounded printable-ASCII header fields, and `-` for STRUCTURED-DATA. Timestamps preserve the timezone: UTC uses `Z`, while UTC+07:00 uses `+07:00`.
+- `cef` places a CEF:0 payload in the MSG of an RFC5424 envelope. It uses a stable synthetic identity (`DeviceVendor=isc4`, `DeviceProduct=flog`, event class `1001`) and the project version as DeviceVersion. It represents a network connection allowed event with IPv4 source/destination, a random source port, destination port `443`, protocol `TCP`, and action `allowed`.
+
+CEF always uses syslog **local4.warning**, PRI **164** (`20 * 8 + 4`). The CEF Severity header is independently fixed at **5** (Medium); it is not derived from syslog severity. Extensions appear in this order: `src`, `dst`, `spt`, `dpt`, `proto`, `act`, `msg`. CEF escaping keeps logical CR/LF inside values as literal `\r`/`\n` sequences, so each generated event occupies one physical line.
+
+```bash
+./flog -f cef -t udp --target 192.168.1.10:514 -n 100
+./flog -f cef -t tcp --target 192.168.1.10:515 -n 100
+```
+
+All outputs retain the existing terminal LF. It is output/framing behavior, separate from the syslog/CEF message grammar. TCP uses newline framing, not RFC6587 octet-counted framing. Raw CEF, selectable envelopes/CEF versions, and configurable CEF fields are not supported.
+
+Specifications: [RFC3164](https://www.rfc-editor.org/rfc/rfc3164), [RFC5424](https://www.rfc-editor.org/rfc/rfc5424), [OpenText CEF Implementation Standard v27](https://docs.microfocus.com/doc/2097/26.1/siemcefimplementationstandard).
 
 ## Supported Output Types
 
@@ -105,7 +123,7 @@ flog [options]
 
 ## Network Output
 
-One isc4-flog process generates one format to one output type and one destination. Run separate processes when you need different formats or destinations.
+The single-stream CLI generates one format to one output type and one destination. Use separate processes or YAML multi-stream configuration for concurrent destinations.
 
 ### UDP
 
@@ -154,9 +172,25 @@ The required fields are `name`, `format`, `type`, and `target`. The optional fie
 
 If one stream has a connection or write error, isc4-flog stops the remaining streams and reports the failing stream name. Ctrl+C stops all active streams cleanly. TCP connections are still one-per-stream and reused; each UDP stream uses its own connected socket and emits one log per datagram.
 
+CEF uses the same configuration fields. For example, save this as `flog.yaml` and run `./flog --config flog.yaml`:
+
+```yaml
+streams:
+  - name: cef-udp
+    format: cef
+    type: udp
+    target: 192.168.1.10:514
+    number: 100
+  - name: cef-tcp
+    format: cef
+    type: tcp
+    target: 192.168.1.10:515
+    number: 100
+```
+
 ## Rsyslog Examples
 
-These minimal receiver configurations write raw messages to a file. Adjust the port and output path for your environment.
+These minimal receiver configurations write parsed message bodies (`%msg%`) to a file. Adjust the port and output path for your environment.
 
 ### UDP receiver
 
@@ -185,6 +219,41 @@ input(type="imtcp" port="515" ruleset="flog_tcp" supportOctetCountedFraming="off
 ```
 
 TCP output uses raw newline-delimited messages, not RFC6587 octet-counted framing. Setting `supportOctetCountedFraming="off"` is important for raw logs that begin with digits, such as Apache access logs beginning with an IP address; otherwise rsyslog can interpret the leading digits as an octet-counted frame length.
+
+### Manual CEF acceptance with AMA / Microsoft Sentinel
+
+The acceptance path is `isc4-flog -> Rsyslog -> AMA -> CommonSecurityLog`. Configure the [CEF via AMA connector and DCR](https://learn.microsoft.com/en-us/azure/sentinel/connect-cef-syslog-ama) to collect `local4` at Warning or a more inclusive minimum severity.
+
+The file-only rulesets above do not automatically invoke AMA's default-ruleset forwarding rules. On the AMA forwarder, use inputs in the default ruleset and retain the connector-installed forwarding configuration. For example (reuse existing modules/listeners instead of loading or binding them twice):
+
+```conf
+module(load="imudp")
+module(load="imtcp")
+input(type="imudp" port="514")
+input(type="imtcp" port="515" supportOctetCountedFraming="off")
+```
+
+Send the single-stream CEF examples above, then query the workspace:
+
+```kusto
+CommonSecurityLog
+| where TimeGenerated > ago(1h)
+| where DeviceVendor == "isc4" and DeviceProduct == "flog"
+| where DeviceEventClassID == "1001"
+| project TimeGenerated, DeviceVersion, Activity, LogSeverity,
+          SourceIP, DestinationIP, SourcePort, DestinationPort,
+          Protocol, DeviceAction, Message
+```
+
+Check the fields against the [Microsoft CEF mapping](https://learn.microsoft.com/en-us/azure/sentinel/cef-name-mapping). In particular, protocol should be `TCP`, destination port `443`, action `allowed`, and CEF severity Medium (`5`). These describe the synthetic event even when its delivery uses UDP.
+
+For local inspection, Rsyslog parses the syslog header and exposes CEF in `%msg%`; `%rawmsg%` is useful for diagnostics but is not a guarantee of byte-identical network data. Capture actual packets, including the UDP terminal LF, with:
+
+```bash
+sudo tcpdump -i any -nn -s 0 -X 'udp dst port 514 or tcp dst port 515'
+```
+
+Verify one LF-terminated CEF event per UDP datagram and newline framing on TCP. Rsyslog parsing and Azure ingestion are manual acceptance checks; automated tests do not require either service.
 
 ## Examples
 
