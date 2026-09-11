@@ -199,6 +199,8 @@ func NewLog(format string, t time.Time) string {
 		return NewRFC3164Log(t)
 	case "rfc5424":
 		return NewRFC5424Log(t)
+	case "cef":
+		return NewCEFLog(t)
 	case "common_log":
 		return NewCommonLogFormat(t)
 	case "json":
