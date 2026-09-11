@@ -8,6 +8,7 @@ require (
 	github.com/mingrammer/cfmt v1.0.0
 	github.com/spf13/pflag v1.0.0
 	github.com/stretchr/testify v1.2.1
+	go.yaml.in/yaml/v3 v3.0.5
 )
 
 require (

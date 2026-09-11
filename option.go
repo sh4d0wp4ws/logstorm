@@ -31,6 +31,10 @@ Options:
                            - stdout (default)
                            - log
                            - gz
+                           - tcp
+                           - udp
+      --target string      network destination in host:port form. Required for tcp and udp.
+      --config string      YAML configuration file for multiple TCP/UDP streams.
   -n, --number integer     number of lines to generate.
   -b, --bytes integer      size of logs to generate (in bytes).
                            "bytes" will be ignored when "number" is set.
@@ -53,6 +57,7 @@ type Option struct {
 	Format    string
 	Output    string
 	Target    string
+	Config    string
 	Type      string
 	Number    int
 	Bytes     int
@@ -85,6 +90,7 @@ func defaultOptions() *Option {
 		Format:    "apache_common",
 		Output:    "generated.log",
 		Target:    "",
+		Config:    "",
 		Type:      "stdout",
 		Number:    1000,
 		Bytes:     0,
@@ -185,12 +191,13 @@ func ParseOptions() *Option {
 	format := pflag.StringP("format", "f", opts.Format, "Log format")
 	output := pflag.StringP("output", "o", opts.Output, "Path-like output filename")
 	target := pflag.String("target", opts.Target, "Network destination in host:port form")
+	config := pflag.String("config", opts.Config, "YAML configuration file for multiple TCP/UDP streams")
 	logType := pflag.StringP("type", "t", opts.Type, "Log output type")
 	number := pflag.IntP("number", "n", opts.Number, "Number of lines to generate")
 	bytes := pflag.IntP("bytes", "b", opts.Bytes, "Size of logs to generate. (in bytes)")
 	sleepString := pflag.StringP("sleep", "s", "0s", "Creation time interval (default unit: seconds)")
 	delayString := pflag.StringP("delay", "d", "0s", "Log generation speed (default unit: seconds)")
-	splitBy := pflag.IntP("split", "p", opts.SplitBy, "Maximum number of lines or size of a log file")
+	splitBy := pflag.IntP("split-by", "p", opts.SplitBy, "Maximum number of lines or size of a log file")
 	overwrite := pflag.BoolP("overwrite", "w", false, "Overwrite the existing log files")
 	forever := pflag.BoolP("loop", "l", false, "Loop output forever until killed")
 
@@ -203,6 +210,20 @@ func ParseOptions() *Option {
 	if *version {
 		printVersion()
 		os.Exit(0)
+	}
+	configChanged, err := flagChanged("config")
+	if err != nil {
+		errorExit(err)
+	}
+	if configChanged {
+		if strings.TrimSpace(*config) == "" {
+			errorExit(errors.New("config path is required"))
+		}
+		if err := validateConfigFlagConflicts(); err != nil {
+			errorExit(err)
+		}
+		opts.Config = strings.TrimSpace(*config)
+		return opts
 	}
 	if opts.Format, err = ParseFormat(*format); err != nil {
 		errorExit(err)
@@ -232,6 +253,27 @@ func ParseOptions() *Option {
 	opts.Overwrite = *overwrite
 	opts.Forever = *forever
 	return opts
+}
+
+func validateConfigFlagConflicts() error {
+	for _, name := range []string{"format", "output", "target", "type", "number", "bytes", "sleep", "delay", "split-by", "overwrite", "loop"} {
+		changed, err := flagChanged(name)
+		if err != nil {
+			return err
+		}
+		if changed {
+			return fmt.Errorf("--config cannot be used with --%s", name)
+		}
+	}
+	return nil
+}
+
+func flagChanged(name string) (bool, error) {
+	flag := pflag.Lookup(name)
+	if flag == nil {
+		return false, fmt.Errorf("internal error: --%s is not registered", name)
+	}
+	return flag.Changed, nil
 }
 
 func isNetworkOutput(logType string) bool {
