@@ -1,140 +1,195 @@
-# Flog
+# isc4-flog
 
-[![go report card](https://goreportcard.com/badge/github.com/mingrammer/flog)](https://goreportcard.com/report/github.com/mingrammer/flog) [![docker download](https://img.shields.io/docker/pulls/mingrammer/flog.svg)](https://hub.docker.com/r/mingrammer/flog)
+isc4-flog generates synthetic logs for testing log pipelines, parsers, and receivers. It supports local output and network delivery over TCP or UDP.
 
-flog is a fake log generator for common log formats such as apache-common, apache error and RFC3164 syslog.
+## Overview
 
-It is useful for testing some tasks which require log data like amazon kinesis log stream test.
+isc4-flog is based on [mingrammer/flog](https://github.com/mingrammer/flog) and is maintained independently. This repository adds TCP and UDP output while retaining the original log-generation and file-output workflow.
 
-> Thanks to [gofakeit](https://github.com/brianvoe/gofakeit) 😘
+Use it to produce a selected log format for stdout, a file, a gzip file, or one network destination.
+
+## Features
+
+- Synthetic log generation in several common formats
+- Output to stdout, plain files, gzip files, TCP, or UDP
+- Configurable network destination with `--target host:port`
+- Finite generation by line count or byte count
+- Continuous generation with `--loop`
+- File splitting for plain and gzip file outputs
+
+## Supported Log Formats
+
+- `apache_common`
+- `apache_combined`
+- `apache_error`
+- `rfc3164`
+- `rfc5424`
+- `common_log`
+- `json`
+
+## Supported Output Types
+
+| Type | Description |
+| --- | --- |
+| `stdout` | Writes generated logs to standard output. This is the default. |
+| `log` | Writes generated logs to a plain file. |
+| `gz` | Writes generated logs to a gzip-compressed file. |
+| `tcp` | Sends newline-delimited logs through one reused TCP connection. |
+| `udp` | Sends each generated log as one UDP datagram. |
+
+`--target host:port` is required for `tcp` and `udp`. It accepts an IP address or hostname with a port.
 
 ## Installation
 
-### Using go install
+Build from source with Go:
 
 ```bash
-go install github.com/mingrammer/flog
+git clone <your-isc4-flog-repository-url>
+cd isc4-flog
+go build -o flog .
 ```
 
-### Using [homebrew](https://brew.sh)
+Run the compiled binary:
 
+```bash
+./flog --help
 ```
-brew tap mingrammer/flog
-brew install flog
-```
 
-### Using .tar.gz archive
+On Windows, run `./flog.exe --help`.
 
-Download gzip file from [Github Releases](https://github.com/mingrammer/flog/releases/latest) according to your OS. Then, copy the unzipped executable to under system path.
+## Quick Start
 
-### Using [docker](https://www.docker.com)
+```bash
+# Write 10 Apache common logs to stdout
+./flog -f apache_common -n 10
 
-```
-docker run -it --rm mingrammer/flog
+# Write 100 Apache combined logs to a file
+./flog -f apache_combined -t log -o access.log -n 100
+
+# Send 100 Apache common logs over UDP
+./flog -f apache_common -t udp --target 192.168.1.10:514 -n 100
+
+# Send 100 Apache combined logs over TCP
+./flog -f apache_combined -t tcp --target 192.168.1.10:515 -n 100
+
+# Generate RFC3164 logs continuously until interrupted
+./flog -f rfc3164 -t udp --target 192.168.1.10:514 --loop
 ```
 
 ## Usage
 
-There are useful options. (`flog --help`)
-
-```console
-Options:
-  -f, --format string      log format. available formats:
-                           - apache_common (default)
-                           - apache_combined
-                           - apache_error
-                           - rfc3164
-                           - rfc5424
-                           - json
-  -o, --output string      output filename. Path-like is allowed. (default "generated.log")
-      --target string      network destination in host:port form. Required for tcp and udp output.
-  -t, --type string        log output type. available types:
-                           - stdout (default)
-                           - log
-                           - gz
-                           - tcp
-                           - udp
-  -n, --number integer     number of lines to generate.
-  -b, --bytes integer      size of logs to generate (in bytes).
-                           "bytes" will be ignored when "number" is set.
-  -s, --sleep duration     fix creation time interval for each log (default unit "seconds"). It does not actually sleep.
-                           examples: 10, 20ms, 5s, 1m
-  -d, --delay duration     delay log generation speed (default unit "seconds").
-                           examples: 10, 20ms, 5s, 1m
-  -p, --split-by integer   set the maximum number of lines or maximum size in bytes of a log file.
-                           with "number" option, the logs will be split whenever the maximum number of lines is reached.
-                           with "byte" option, the logs will be split whenever the maximum size in bytes is reached.
-  -w, --overwrite          overwrite the existing log files.
-  -l, --loop               loop output forever until killed.
+```text
+flog [options]
 ```
 
-```console
-# Generate 1000 lines of logs to stdout
-$ flog
-
-# Generate 200 lines of logs with a time interval of 10s for each log. It doesn't actually sleep while generating
-$ flog -s 10s -n 200 
-
-# Generate a single log file with 1000 lines of logs, then overwrite existing log file
-$ flog -t log -w
-
-# Generate a single log gzip file with 3000 lines of logs every 300ms. It actually sleep (delay) while generating
-$ flog -t gz -o log.gz -n 3000 -d 10s
-
-# Generate logs up to 10MB and split log files every 1MB in "web/log/*.log" path with "apache combined" format
-$ flog -t log -f apache_combined -o web/log/apache.log -b 10485760 -p 1048576
-
-# Generate logs in rfc3164 format infinitely until killed
-$ flog -f rfc3164 -l
-
-```
+| Option | Description |
+| --- | --- |
+| `-f`, `--format` | Log format. Default: `apache_common`. |
+| `-t`, `--type` | Output type. Default: `stdout`. |
+| `-o`, `--output` | Output path for `log` and `gz`. Default: `generated.log`. |
+| `--target` | Network destination in `host:port` form. Required for `tcp` and `udp`. |
+| `-n`, `--number` | Number of logs to generate. Default: `1000`. |
+| `-b`, `--bytes` | Generate until this output size in bytes is reached. When nonzero, it is used instead of `--number`. |
+| `-s`, `--sleep` | Advance each generated timestamp by this interval without waiting. A bare number is seconds. |
+| `-d`, `--delay` | Wait this interval between generated logs. A bare number is seconds. |
+| `-p`, `--split-by` | Split `log` and `gz` output by line count or byte size. |
+| `-w`, `--overwrite` | Allow an existing `log` or `gz` output file to be overwritten. |
+| `-l`, `--loop` | Generate continuously until the process is interrupted. |
+| `-h`, `--help` | Show help. |
+| `-v`, `--version` | Show the version. |
 
 ## Network Output
 
-Use `-t tcp` or `-t udp` with `--target host:port`. A flog process sends one log format to one output and one target.
+One isc4-flog process generates one format to one output type and one destination. Run separate processes when you need different formats or destinations.
 
-```console
-# Send Apache common logs to a UDP destination
-$ flog -f apache_common -t udp --target 192.168.1.10:514
+### UDP
 
-# Send Apache combined logs to a TCP destination
-$ flog -f apache_combined -t tcp --target 192.168.1.10:515
-
-# Generate RFC3164 logs continuously over UDP
-$ flog -f rfc3164 -t udp --target 192.168.1.10:514 --loop
+```bash
+./flog -f apache_common -t udp --target 192.168.1.10:514 -n 100
 ```
 
-TCP opens one connection and reuses it for all generated logs. Messages are currently newline-delimited. UDP sends one generated log, including its newline, per datagram.
+isc4-flog opens one UDP socket. Each generated log, including its trailing newline, is sent as one UDP datagram. UDP does not guarantee delivery, and isc4-flog only returns errors reported by the operating system.
 
-### rsyslog imtcp
+### TCP
 
-For raw TCP logs, configure rsyslog without octet-counted framing:
+```bash
+./flog -f apache_combined -t tcp --target 192.168.1.10:515 -n 100
+```
+
+isc4-flog opens one TCP connection and reuses it for all generated logs. Messages are newline-delimited. Connection and write errors are returned; automatic reconnect is not implemented.
+
+## Rsyslog Examples
+
+These minimal receiver configurations write raw messages to a file. Adjust the port and output path for your environment.
+
+### UDP receiver
+
+```conf
+module(load="imudp")
+
+template(name="FlogRaw" type="string" string="%msg%\n")
+ruleset(name="flog_udp") {
+    action(type="omfile" file="/var/log/isc4-flog-udp.log" template="FlogRaw")
+}
+
+input(type="imudp" port="514" ruleset="flog_udp")
+```
+
+### TCP receiver
 
 ```conf
 module(load="imtcp")
-input(type="imtcp" port="515" supportOctetCountedFraming="off")
+
+template(name="FlogRaw" type="string" string="%msg%\n")
+ruleset(name="flog_tcp") {
+    action(type="omfile" file="/var/log/isc4-flog-tcp.log" template="FlogRaw")
+}
+
+input(type="imtcp" port="515" ruleset="flog_tcp" supportOctetCountedFraming="off")
 ```
 
-This is important for logs that start with digits, such as Apache access logs beginning with an IP address; otherwise rsyslog may interpret the leading digits as an octet-counted frame length.
+TCP output uses raw newline-delimited messages, not RFC6587 octet-counted framing. Setting `supportOctetCountedFraming="off"` is important for raw logs that begin with digits, such as Apache access logs beginning with an IP address; otherwise rsyslog can interpret the leading digits as an octet-counted frame length.
 
-## Supported Formats
+## Examples
 
-- Apache common
-- Apache combined
-- Apache error
-- RFC3164
-- RFC5424
-- Common log fomat
-- JSON
+Run separate processes for separate destinations:
 
-## Supported Outputs
+```text
+Process 1: apache_common -> UDP -> 192.168.1.10:514
+Process 2: apache_combined -> TCP -> 192.168.1.10:515
+```
 
-- Stdout
-- File
-- Gzip
-- TCP
-- UDP
+```bash
+# Process 1
+./flog -f apache_common -t udp --target 192.168.1.10:514 -n 100
+
+# Process 2, in another terminal
+./flog -f apache_combined -t tcp --target 192.168.1.10:515 -n 100
+```
+
+## Current Limitations
+
+- One log format, output type, and destination per process
+- No multi-stream configuration
+- No automatic TCP reconnect
+
+## Development
+
+```bash
+# Build
+go build -o flog .
+
+# Run tests
+go test ./...
+
+# Run static checks
+go vet ./...
+```
+
+## Upstream
+
+isc4-flog is based on [mingrammer/flog](https://github.com/mingrammer/flog) and is maintained independently in this repository. The upstream project remains credited for the original log generator.
 
 ## License
 
-[MIT](LICENSE)
+isc4-flog is distributed under the [MIT License](LICENSE). The existing license retains the upstream copyright notice.
