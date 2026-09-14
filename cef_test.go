@@ -23,7 +23,7 @@ func TestCEFEnvelopeAndSchema(t *testing.T) {
 	log := NewLog("cef", stopped)
 	t.Log(log)
 	fields := assertRFC5424(t, log, 164, "2018-04-22T09:30:00.000Z")
-	if strings.Join(fields[2:7], " ") != "isc4-flog.example isc4-flog - CEF -" {
+	if strings.Join(fields[2:7], " ") != "logstorm.example LogStorm - CEF -" {
 		t.Fatalf("incorrect CEF envelope: %q", log)
 	}
 	if !strings.HasPrefix(fields[7], "CEF:0|") || strings.ContainsAny(log, "\r\n") {
@@ -31,7 +31,7 @@ func TestCEFEnvelopeAndSchema(t *testing.T) {
 	}
 	// The fixed generated header contains no escaped pipes; escaping is tested separately.
 	header := strings.SplitN(fields[7], "|", 8)
-	if len(header) != 8 || strings.Join(header[:7], "|") != "CEF:0|isc4|flog|"+version+"|1001|Synthetic network connection allowed|5" {
+	if len(header) != 8 || strings.Join(header[:7], "|") != "CEF:0|LogStorm|LogStorm|"+version+"|1001|Synthetic network connection allowed|5" {
 		t.Fatalf("incorrect CEF header: %q", fields[7])
 	}
 	for i, limit := range []int{63, 63, 31, 1023, 512} {
@@ -138,7 +138,7 @@ func TestCEFStreamsSendTCPAndUDP(t *testing.T) {
 		if !strings.HasSuffix(packet, "\n") || strings.ContainsAny(strings.TrimSuffix(packet, "\n"), "\r\n") {
 			t.Fatalf("incorrect CEF transport framing: %q", packet)
 		}
-		if !strings.HasPrefix(packet, "<164>1 ") || !strings.Contains(packet, " isc4-flog.example isc4-flog - CEF - CEF:0|") {
+		if !strings.HasPrefix(packet, "<164>1 ") || !strings.Contains(packet, " logstorm.example LogStorm - CEF - CEF:0|") {
 			t.Fatalf("invalid delivered CEF envelope: %q", packet)
 		}
 	}
@@ -166,8 +166,8 @@ func TestCEFEscaping(t *testing.T) {
 	if escaped != `first\r\nsecond\\n third\=ok|yes` || strings.ContainsAny(escaped, "\r\n") {
 		t.Fatalf("invalid multiline escaping: %q", escaped)
 	}
-	log := formatRFC5424(164, stopped, "isc4-flog.example", "isc4-flog", "-", "CEF",
-		"CEF:0|isc4|flog|"+version+"|1001|Synthetic network connection allowed|5|msg="+escaped)
+	log := formatRFC5424(164, stopped, "logstorm.example", "LogStorm", "-", "CEF",
+		"CEF:0|LogStorm|LogStorm|"+version+"|1001|Synthetic network connection allowed|5|msg="+escaped)
 	if strings.ContainsAny(log, "\r\n") || !strings.HasSuffix(log, "msg="+escaped) {
 		t.Fatalf("logical newline escaped incorrectly in syslog body: %q", log)
 	}

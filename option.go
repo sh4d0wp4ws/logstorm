@@ -12,9 +12,9 @@ import (
 )
 
 const version = "0.4.4"
-const usage = `flog is a fake log generator for common log formats
+const usage = `LogStorm is a fake log generator for common log formats
 
-Usage: flog [options]
+Usage: logstorm [options]
 
 Version: %s
 
@@ -81,7 +81,7 @@ func printUsage() {
 }
 
 func printVersion() {
-	fmt.Printf("flog version %s\n", version)
+	fmt.Printf("logstorm version %s\n", version)
 }
 
 func errorExit(err error) {

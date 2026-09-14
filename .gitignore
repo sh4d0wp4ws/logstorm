@@ -5,6 +5,8 @@ vendor/
 dist/
 flog
 flog.exe
+logstorm
+logstorm.exe
 
 # Editors
 .idea/
@@ -12,6 +14,7 @@ flog.exe
 
 # Config
 flog.yaml
+logstorm.yaml
 *.local.yaml
 
 # Backup

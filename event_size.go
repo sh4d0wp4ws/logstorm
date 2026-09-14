@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	// eventSizeProductMax is an isc4-flog allocation safety policy, not a
+	// eventSizeProductMax is a LogStorm allocation safety policy, not a
 	// protocol or receiver message-size limit.
 	eventSizeProductMax   = 1 << 20
 	eventSizeUDPMax       = 65507
@@ -21,8 +21,8 @@ const (
 	rfc3164FixedMax        = 62
 	rfc5424FixedMax        = 103
 	jsonFixedMax           = 327
-	cefFixedMin            = 201
-	cefFixedMax            = 223
+	cefFixedMin            = 207
+	cefFixedMax            = 229
 
 	apacheCommonEventSizeMin   = apacheCommonFixedMax + eventSizeMinimumField + eventSizeLineFeed
 	apacheCombinedEventSizeMin = apacheCombinedFixedMax + eventSizeMinimumField + eventSizeLineFeed

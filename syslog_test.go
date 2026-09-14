@@ -96,7 +96,7 @@ func TestRFC3164ContentBudgetPreservesPrefix(t *testing.T) {
 			t.Fatalf("invalid packet budget: body=%d", len(log))
 		}
 	}
-	if log := formatRFC3164(0, created, "!", "!", 1, "ok"); log != "<0>Apr  7 09:30:00 flog flog[1]: ok" {
+	if log := formatRFC3164(0, created, "!", "!", 1, "ok"); log != "<0>Apr  7 09:30:00 logstorm logstorm[1]: ok" {
 		t.Fatalf("invalid empty-name fallback: %q", log)
 	}
 }
