@@ -40,14 +40,16 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 		}
 		return err
 	}
+	pacer := newGenerationPacer(ctx, time.Now(), option.EPS, option.Duration)
 	if option.Type != "stdout" {
 		writer = &closeOnceWriter{WriteCloser: writer}
 		stopCancellationClose := func() {}
 		if isNetworkOutput(option.Type) {
-			stopCancellationClose = closeOnCancellation(ctx, writer)
+			stopCancellationClose = closeOnCancellation(pacer.Context(), writer, pacer.MarkDurationWriterClose)
 		}
 		defer func() {
 			stopCancellationClose()
+			pacer.Cancel()
 			if writer == nil {
 				return
 			}
@@ -58,20 +60,30 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 				fmt.Println(logFileName, "is created.")
 			}
 		}()
+	} else {
+		defer pacer.Cancel()
 	}
 
 	if option.Forever {
 		for {
-			if err := waitForDelay(ctx, delay); err != nil {
-				return err
+			if stopped, waitErr := pacer.Wait(delay); waitErr != nil {
+				return waitErr
+			} else if stopped {
+				return nil
 			}
-			log := NewLog(option.Format, created)
+			log := NewLog(option.Format, pacer.Timestamp(created))
+			if stopped, stopErr := pacer.Stopped(); stopErr != nil {
+				return stopErr
+			} else if stopped {
+				return nil
+			}
 			if _, err := writer.Write([]byte(log + "\n")); err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
+				if err := pacer.WriteError(err); err != nil {
+					return err
 				}
-				return err
+				return nil
 			}
+			pacer.Wrote()
 			created = created.Add(interval)
 		}
 	}
@@ -79,16 +91,24 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 	if option.Bytes == 0 {
 		// Generates the logs until the certain number of lines is reached
 		for line := 0; line < option.Number; line++ {
-			if err := waitForDelay(ctx, delay); err != nil {
-				return err
+			if stopped, waitErr := pacer.Wait(delay); waitErr != nil {
+				return waitErr
+			} else if stopped {
+				return nil
 			}
-			log := NewLog(option.Format, created)
+			log := NewLog(option.Format, pacer.Timestamp(created))
+			if stopped, stopErr := pacer.Stopped(); stopErr != nil {
+				return stopErr
+			} else if stopped {
+				return nil
+			}
 			if _, err := writer.Write([]byte(log + "\n")); err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
+				if err := pacer.WriteError(err); err != nil {
+					return err
 				}
-				return err
+				return nil
 			}
+			pacer.Wrote()
 
 			if isFileOutput(option.Type) && (option.SplitBy > 0) && (line > option.SplitBy*splitCount) {
 				writerToClose := writer
@@ -113,16 +133,24 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 		// Generates the logs until the certain size in bytes is reached
 		bytes := 0
 		for bytes < option.Bytes {
-			if err := waitForDelay(ctx, delay); err != nil {
-				return err
+			if stopped, waitErr := pacer.Wait(delay); waitErr != nil {
+				return waitErr
+			} else if stopped {
+				return nil
 			}
-			log := NewLog(option.Format, created)
+			log := NewLog(option.Format, pacer.Timestamp(created))
+			if stopped, stopErr := pacer.Stopped(); stopErr != nil {
+				return stopErr
+			} else if stopped {
+				return nil
+			}
 			if _, err := writer.Write([]byte(log + "\n")); err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
+				if err := pacer.WriteError(err); err != nil {
+					return err
 				}
-				return err
+				return nil
 			}
+			pacer.Wrote()
 
 			bytes += len(log)
 			if isFileOutput(option.Type) && (option.SplitBy > 0) && (bytes > option.SplitBy*splitCount+1) {
@@ -166,7 +194,7 @@ func waitForDelay(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-func closeOnCancellation(ctx context.Context, writer io.WriteCloser) func() {
+func closeOnCancellation(ctx context.Context, writer io.WriteCloser, beforeClose func()) func() {
 	if ctx.Done() == nil {
 		return func() {}
 	}
@@ -176,6 +204,9 @@ func closeOnCancellation(ctx context.Context, writer io.WriteCloser) func() {
 		defer close(done)
 		select {
 		case <-ctx.Done():
+			if beforeClose != nil {
+				beforeClose()
+			}
 			_ = writer.Close()
 		case <-stop:
 		}

@@ -15,6 +15,10 @@ Current custom functionality includes:
 - Configurable network target using `--target host:port`
 - Reuse of a single TCP connection during a generation run
 - One generated log per UDP datagram
+- YAML configuration for concurrent TCP and UDP streams
+- RFC3164, RFC5424, and CEF log formats
+- Per-stream EPS pacing
+- Duration-bounded streams
 
 Treat `origin` as this project's repository and `upstream` as the original `mingrammer/flog` repository.
 

@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -69,6 +72,108 @@ streams:
 	assert.True(t, streams[1].Option.Forever)
 }
 
+func TestLoadStreamsAppliesEPSAndDuration(t *testing.T) {
+	streams, err := LoadStreams(writeConfig(t, `
+streams:
+  - name: paced
+    format: apache_common
+    type: udp
+    target: localhost:514
+    number: 7
+    eps: 25
+    duration: " 30s "
+`))
+
+	if !assert.NoError(t, err) || !assert.Len(t, streams, 1) {
+		return
+	}
+	assert.Equal(t, 25, streams[0].Option.EPS)
+	assert.Equal(t, 30*time.Second, streams[0].Option.Duration)
+	assert.False(t, streams[0].Option.Forever)
+}
+
+func TestLoadStreamsUsesDurationForContinuousStreamWhenNumberAndLoopAreOmitted(t *testing.T) {
+	streams, err := LoadStreams(writeConfig(t, `
+streams:
+  - name: duration-only
+    format: apache_common
+    type: udp
+    target: localhost:514
+    duration: 10s
+`))
+
+	if !assert.NoError(t, err) || !assert.Len(t, streams, 1) {
+		return
+	}
+	assert.True(t, streams[0].Option.Forever)
+	assert.Equal(t, defaultOptions().Number, streams[0].Option.Number)
+}
+
+func TestLoadStreamsPreservesExplicitZeroNumberWithDuration(t *testing.T) {
+	streams, err := LoadStreams(writeConfig(t, `
+streams:
+  - name: zero
+    format: apache_common
+    type: udp
+    target: localhost:514
+    number: 0
+    duration: 10s
+`))
+
+	if !assert.NoError(t, err) || !assert.Len(t, streams, 1) {
+		return
+	}
+	assert.False(t, streams[0].Option.Forever)
+	assert.Equal(t, 0, streams[0].Option.Number)
+}
+
+func TestLoadStreamsRunsDurationOnlyStreamUntilExpiry(t *testing.T) {
+	listener, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer listener.Close()
+
+	streams, err := LoadStreams(writeConfig(t, fmt.Sprintf(`
+streams:
+  - name: duration-only
+    format: apache_common
+    type: udp
+    target: %s
+    eps: 1
+    duration: 100ms
+`, listener.LocalAddr())))
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- RunStreams(ctx, streams)
+	}()
+
+	if err := listener.SetReadDeadline(time.Now().Add(300 * time.Millisecond)); !assert.NoError(t, err) {
+		return
+	}
+	buffer := make([]byte, 4096)
+	n, _, err := listener.ReadFromUDP(buffer)
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, byte('\n'), buffer[n-1])
+	}
+
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-timer.C:
+		t.Fatal("duration-only stream did not complete")
+	}
+}
+
 func TestLoadStreamsTrimsFormatAndType(t *testing.T) {
 	streams, err := LoadStreams(writeConfig(t, `
 streams:
@@ -125,6 +230,13 @@ func TestLoadStreamsRejectsInvalidConfiguration(t *testing.T) {
 		{"missing target", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n"},
 		{"invalid target", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost\n"},
 		{"invalid delay", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    delay: nope\n"},
+		{"zero eps", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    eps: 0\n"},
+		{"negative eps", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    eps: -1\n"},
+		{"malformed duration", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    duration: nope\n"},
+		{"zero duration", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    duration: 0s\n"},
+		{"negative duration", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    duration: -1s\n"},
+		{"eps and delay", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    eps: 1\n    delay: 1s\n"},
+		{"eps and zero delay", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    eps: 1\n    delay: 0s\n"},
 		{"malformed scalar", "streams:\n  - name: apache\n    format: 123\n    type: udp\n    target: localhost:514\n"},
 		{"multiple documents", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n---\nstreams: []\n"},
 	}

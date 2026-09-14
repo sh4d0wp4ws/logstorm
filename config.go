@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -26,13 +27,15 @@ type Config struct {
 }
 
 type StreamConfig struct {
-	Name   strictString  `yaml:"name"`
-	Format strictString  `yaml:"format"`
-	Type   strictString  `yaml:"type"`
-	Target strictString  `yaml:"target"`
-	Number *int          `yaml:"number"`
-	Loop   bool          `yaml:"loop"`
-	Delay  *strictString `yaml:"delay"`
+	Name     strictString  `yaml:"name"`
+	Format   strictString  `yaml:"format"`
+	Type     strictString  `yaml:"type"`
+	Target   strictString  `yaml:"target"`
+	Number   *int          `yaml:"number"`
+	Loop     bool          `yaml:"loop"`
+	Delay    *strictString `yaml:"delay"`
+	EPS      *int          `yaml:"eps"`
+	Duration *strictString `yaml:"duration"`
 }
 
 type Stream struct {
@@ -125,13 +128,44 @@ func (streamConfig StreamConfig) stream() (Stream, error) {
 	if streamConfig.Number != nil && streamConfig.Loop {
 		return Stream{}, fmt.Errorf("stream %q: number and loop cannot both be set", name)
 	}
-	option.Forever = streamConfig.Loop
+	if streamConfig.EPS != nil && streamConfig.Delay != nil {
+		return Stream{}, fmt.Errorf("stream %q: eps and delay cannot both be set", name)
+	}
 	if streamConfig.Delay != nil {
 		if option.Delay, err = ParseDelay(string(*streamConfig.Delay)); err != nil {
 			return Stream{}, fmt.Errorf("stream %q: invalid delay: %w", name, err)
 		}
 	}
+	if streamConfig.EPS != nil {
+		if option.EPS, err = parseEPS(*streamConfig.EPS); err != nil {
+			return Stream{}, fmt.Errorf("stream %q: %w", name, err)
+		}
+	}
+	if streamConfig.Duration != nil {
+		if option.Duration, err = parseDuration(string(*streamConfig.Duration)); err != nil {
+			return Stream{}, fmt.Errorf("stream %q: invalid duration: %w", name, err)
+		}
+	}
+	option.Forever = streamConfig.Loop || (streamConfig.Duration != nil && streamConfig.Number == nil)
 	return Stream{Name: name, Option: option}, nil
+}
+
+func parseEPS(eps int) (int, error) {
+	if eps <= 0 {
+		return 0, fmt.Errorf("eps must be positive")
+	}
+	return eps, nil
+}
+
+func parseDuration(value string) (time.Duration, error) {
+	duration, err := time.ParseDuration(strings.TrimSpace(value))
+	if err != nil {
+		return 0, err
+	}
+	if duration <= 0 {
+		return 0, fmt.Errorf("duration must be positive")
+	}
+	return duration, nil
 }
 
 func validateNetworkTarget(target string) error {
