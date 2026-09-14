@@ -191,7 +191,7 @@ func formatRFC3164(priority int, t time.Time, host, tag string, pid int, message
 		return -1
 	}, tag)
 	if tag == "" {
-		tag = "flog"
+		tag = "logstorm"
 	}
 	if len(tag) > 32 {
 		tag = tag[:32]
@@ -224,7 +224,7 @@ func syslogHostname(value string) string {
 		}
 		label = strings.Trim(label, "-")
 		if label == "" {
-			label = "flog"
+			label = "logstorm"
 		}
 		labels[i] = label
 	}
@@ -267,7 +267,7 @@ func NewCEFLog(t time.Time) string {
 }
 
 func newCEFLog(t time.Time, eventSize int) (string, error) {
-	header := []string{"CEF:0", "isc4", "flog", version, "1001", "Synthetic network connection allowed", "5"}
+	header := []string{"CEF:0", "LogStorm", "LogStorm", version, "1001", "Synthetic network connection allowed", "5"}
 	for i := 1; i < len(header); i++ {
 		header[i] = escapeCEFHeader(header[i])
 	}
@@ -290,7 +290,7 @@ func formatCEFLog(t time.Time, header []string, source, destination string, sour
 	extension := fmt.Sprintf("src=%s dst=%s spt=%d dpt=443 proto=TCP act=allowed msg=%s",
 		source, destination, sourcePort, escapeCEFExtension(message))
 	// local4.warning (20*8+4) is independent of the CEF Severity header value 5.
-	return formatRFC5424(164, t, "isc4-flog.example", "isc4-flog", "-", "CEF", strings.Join(header, "|")+"|"+extension)
+	return formatRFC5424(164, t, "logstorm.example", "LogStorm", "-", "CEF", strings.Join(header, "|")+"|"+extension)
 }
 
 func escapeCEFHeader(value string) string {

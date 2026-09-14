@@ -1,8 +1,8 @@
-project_name: flog
+project_name: logstorm
 
 builds:
   - id: cli
-    binary: flog
+    binary: logstorm
     goos:
       - windows
       - darwin
@@ -31,18 +31,3 @@ changelog:
       - Update README.md
       - Merge pull request
       - Merge branch
-
-brews:
-  - name: flog
-    download_strategy: CurlDownloadStrategy
-    commit_author:
-      name: mingrammer
-      email: mingrammer@gmail.com
-    homepage: https://github.com/mingrammer/flog
-    description: "A fake log generator for common log formats"
-    repository:
-      owner: mingrammer
-      name: homebrew-flog
-      branch: main
-      token: "{{ .Env.GH_PAT }}"
-    install: bin.install "flog"

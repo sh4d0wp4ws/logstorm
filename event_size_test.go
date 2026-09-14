@@ -29,7 +29,7 @@ func TestNewSizedLogUsesGuaranteedMinimumWithLongestFixedFields(t *testing.T) {
 		{"apache_error", apacheErrorEventSizeMin},
 		{"rfc3164", rfc3164EventSizeMin},
 		{"rfc5424", rfc5424EventSizeMin},
-		{"cef", cefEventSizeMin},
+		{"cef", 231},
 		{"json", jsonEventSizeMin},
 	} {
 		t.Run(test.format, func(t *testing.T) {
@@ -61,11 +61,14 @@ func TestEventSizeConstantsMatchDeterministicLongestFixedFields(t *testing.T) {
 	assertFixedSize(t, "RFC5424", len(formatRFC5424(191, timestamp, domain, word, "10000", "ID1000", "")), 103)
 	assertFixedSize(t, "JSON", len(fmt.Sprintf(JSONLogFormat, address, user, timestamp.Format(CommonLog), method, "", protocol, 504, 30000, referer)), 327)
 
-	header := []string{"CEF:0", "isc4", "flog", version, "1001", "Synthetic network connection allowed", "5"}
+	header := []string{"CEF:0", "LogStorm", "LogStorm", version, "1001", "Synthetic network connection allowed", "5"}
 	for i := 1; i < len(header); i++ {
 		header[i] = escapeCEFHeader(header[i])
 	}
-	assertFixedSize(t, "CEF", len(formatCEFLog(timestamp, header, address, address, 65535, "")), 223)
+	assertFixedSize(t, "CEF", len(formatCEFLog(timestamp, header, address, address, 65535, "")), 229)
+	if cefFixedMin != 207 || cefFixedMax != 229 || cefEventSizeMin != 231 || cefEventSizeMax != 1231 {
+		t.Fatalf("unexpected CEF bounds: fixed %d..%d, event size %d..%d", cefFixedMin, cefFixedMax, cefEventSizeMin, cefEventSizeMax)
+	}
 }
 
 func assertFixedSize(t *testing.T, name string, got, want int) {
@@ -86,7 +89,7 @@ func TestNewSizedLogHonorsExactSizeAndFormatSyntax(t *testing.T) {
 		{"apache_error", 256},
 		{"rfc3164", 1024},
 		{"rfc5424", 512},
-		{"cef", 1225},
+		{"cef", 1231},
 		{"json", 512},
 	} {
 		t.Run(test.format, func(t *testing.T) {
@@ -126,13 +129,13 @@ func TestNewSizedLogHonorsExactSizeAndFormatSyntax(t *testing.T) {
 }
 
 func TestNewSizedCEFUsesShortestBaselineAtMaximum(t *testing.T) {
-	header := []string{"CEF:0", "isc4", "flog", version, "1001", "Synthetic network connection allowed", "5"}
+	header := []string{"CEF:0", "LogStorm", "LogStorm", version, "1001", "Synthetic network connection allowed", "5"}
 	for i := 1; i < len(header); i++ {
 		header[i] = escapeCEFHeader(header[i])
 	}
 	fixed := formatCEFLog(stopped, header, "2.2.2.2", "2.2.2.2", 1024, "")
-	if len(fixed) != 201 {
-		t.Fatalf("short CEF fixed size = %d, want 201", len(fixed))
+	if len(fixed) != 207 {
+		t.Fatalf("short CEF fixed size = %d, want 207", len(fixed))
 	}
 	message, err := sizedText(cefEventSizeMax, len(fixed), 1, 1023)
 	if err != nil {
@@ -159,8 +162,8 @@ func TestNewSizedLogRejectsFormatBoundaries(t *testing.T) {
 		{"rfc3164", rfc3164EventSizeMin - 1},
 		{"rfc3164", rfc3164EventSizeMax + 1},
 		{"rfc5424", rfc5424EventSizeMin - 1},
-		{"cef", cefEventSizeMin - 1},
-		{"cef", cefEventSizeMax + 1},
+		{"cef", 230},
+		{"cef", 1232},
 		{"json", jsonEventSizeMin - 1},
 		{"rfc5424", eventSizeProductMax + 1},
 	} {

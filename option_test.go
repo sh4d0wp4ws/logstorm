@@ -150,7 +150,7 @@ func TestParseOptions(t *testing.T) {
 }
 
 func TestParseOptionsConfigFlagHelper(t *testing.T) {
-	args := os.Getenv("FLOG_PARSE_OPTIONS_ARGS")
+	args := os.Getenv("LOGSTORM_PARSE_OPTIONS_ARGS")
 	if args == "" {
 		return
 	}
@@ -160,7 +160,7 @@ func TestParseOptionsConfigFlagHelper(t *testing.T) {
 
 func TestParseOptionsAllowsConfigWithoutSingleStreamFlags(t *testing.T) {
 	command := exec.Command(os.Args[0], "-test.run=^TestParseOptionsConfigFlagHelper$")
-	command.Env = append(os.Environ(), "FLOG_PARSE_OPTIONS_ARGS=--config|flog.yaml")
+	command.Env = append(os.Environ(), "LOGSTORM_PARSE_OPTIONS_ARGS=--config|logstorm.yaml")
 
 	output, err := command.CombinedOutput()
 	assert.NoError(t, err, string(output))
@@ -168,7 +168,7 @@ func TestParseOptionsAllowsConfigWithoutSingleStreamFlags(t *testing.T) {
 
 func TestParseOptionsRejectsSplitByWithConfig(t *testing.T) {
 	command := exec.Command(os.Args[0], "-test.run=^TestParseOptionsConfigFlagHelper$")
-	command.Env = append(os.Environ(), "FLOG_PARSE_OPTIONS_ARGS=--config|flog.yaml|--split-by|10")
+	command.Env = append(os.Environ(), "LOGSTORM_PARSE_OPTIONS_ARGS=--config|logstorm.yaml|--split-by|10")
 
 	output, err := command.CombinedOutput()
 	assert.Error(t, err)

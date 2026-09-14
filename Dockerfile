@@ -3,14 +3,14 @@ FROM golang
 ENV CGO_ENABLED=0
 ENV GO111MODULE=on
 
-WORKDIR /go/src/flog
+WORKDIR /go/src/logstorm
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . ./
-RUN go build -o /bin/flog
+RUN go build -o /bin/logstorm
 
 FROM scratch
-COPY --from=0 /bin/flog /bin/flog
-ENTRYPOINT ["flog"]
+COPY --from=0 /bin/logstorm /bin/logstorm
+ENTRYPOINT ["logstorm"]

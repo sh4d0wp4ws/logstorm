@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-`isc4-flog` is an independently maintained fork/customization of:
+`LogStorm` is an independently maintained fork/customization of:
 
 - Upstream: https://github.com/mingrammer/flog
 
-The project keeps the original synthetic log generation capabilities and extends them with additional functionality for log-pipeline and SIEM testing.
+The project keeps the original synthetic log generation capabilities and extends them with additional functionality for log-pipeline and SIEM testing. Its Go module is `github.com/sh4d0wp4ws/logstorm` and its binary is `logstorm`.
 
 Current custom functionality includes:
 
@@ -108,7 +108,7 @@ CLI options, defaults, parsing, and validation.
 
 User-facing flags and validation logic belong here.
 
-### `flog.go`
+### `logstorm.go`
 
 Main generation/orchestration flow.
 
@@ -148,7 +148,7 @@ TCP/UDP-specific connection setup belongs here.
 
 Do not duplicate network connection logic in log generators.
 
-### `flog_unix.go` / `flog_windows.go`
+### `logstorm_unix.go` / `logstorm_windows.go`
 
 OS-specific runtime behavior.
 
@@ -165,8 +165,8 @@ network_test.go
 option.go
 option_test.go
 
-flog.go
-flog_test.go
+logstorm.go
+logstorm_test.go
 ```
 
 Do not create a separate `tests/` directory unless the project architecture later provides a clear reason.
@@ -205,7 +205,7 @@ Do not treat successful UDP `Write` as proof that the receiver accepted the mess
 
 ### TCP Framing
 
-`isc4-flog` currently sends newline-delimited TCP messages.
+`LogStorm` currently sends newline-delimited TCP messages.
 
 It does not implement RFC 6587 octet-counted framing.
 
@@ -224,7 +224,7 @@ Do not add TCP framing modes unless they are explicitly requested as a separate 
 The single-stream CLI execution model is:
 
 ```text
-one flog process
+one logstorm process
     =
 one log format
     +
@@ -377,7 +377,7 @@ For network-related changes, automated tests should be supplemented with manual 
 Typical acceptance path:
 
 ```text
-isc4-flog
+LogStorm
    |
    +-- TCP/UDP
    |
@@ -440,7 +440,7 @@ Do not document unimplemented features.
 
 Do not write the README as if this repository were `mingrammer/flog`.
 
-The upstream repository should be clearly credited and referenced, while the README primarily describes `isc4-flog`.
+The upstream repository should be clearly credited and referenced, while the README primarily describes `LogStorm`.
 
 ---
 
@@ -493,7 +493,7 @@ Expected remote roles:
 
 ```text
 origin
-  -> this isc4-flog repository
+  -> this LogStorm repository
 
 upstream
   -> https://github.com/mingrammer/flog.git

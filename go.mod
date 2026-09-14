@@ -1,4 +1,4 @@
-module github.com/mingrammer/flog
+module github.com/sh4d0wp4ws/logstorm
 
 go 1.20
 
