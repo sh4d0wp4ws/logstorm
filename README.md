@@ -16,7 +16,7 @@ Use it to produce a selected log format for stdout, a file, a gzip file, or one 
 - Optional YAML configuration for concurrent TCP and UDP streams
 - Finite generation by line count or byte count
 - Continuous generation with `--loop`
-- EPS pacing and duration-bounded YAML streams
+- EPS pacing, duration-bounded streams, and exact per-event sizing in YAML streams
 - File splitting for plain and gzip file outputs
 
 ## Supported Log Formats
@@ -154,6 +154,7 @@ streams:
     target: 192.168.1.10:514
     number: 100
     eps: 25
+    event_size: 1024
 
   - name: apache-tcp
     format: apache_combined
@@ -170,11 +171,17 @@ Run it with:
 ./flog --config flog.yaml
 ```
 
-The required fields are `name`, `format`, `type`, and `target`. The optional fields are `number`, `loop`, `delay`, `eps`, and `duration`. `type` must be `tcp` or `udp`; `target` must be a valid `host:port` destination. `eps` is a positive integer target rate in events per second and cannot be combined with `delay`, including `delay: 0s`. `duration` is a positive Go duration such as `10s`, `30s`, or `1m`; it starts after the stream writer or network connection has been initialized.
+The required fields are `name`, `format`, `type`, and `target`. The optional fields are `number`, `loop`, `delay`, `eps`, `duration`, and `event_size`. `type` must be `tcp` or `udp`; `target` must be a valid `host:port` destination. `eps` is a positive integer target rate in events per second and cannot be combined with `delay`, including `delay: 0s`. `duration` is a positive Go duration such as `10s`, `30s`, or `1m`; it starts after the stream writer or network connection has been initialized.
 
 When both `number` and `loop` are omitted, the existing default finite count (`1000`) is used. When `duration` is present and both `number` and `loop` are omitted, the stream runs continuously until its duration expires instead. `number` and `loop: true` cannot be specified together. A stream stops when its applicable count or duration limit is reached first. The first EPS event is scheduled immediately, and later events remain anchored to the planned EPS timeline rather than accumulating generation or write time. In EPS mode, the generated log timestamp is that planned event time. The complete file is validated before any stream starts.
 
 Duration expiry is normal stream completion and does not stop other healthy streams. If one stream has a connection or write error, isc4-flog stops the remaining streams and reports the failing stream name. Ctrl+C stops all active streams cleanly. TCP connections are still one-per-stream and reused; each UDP stream uses its own connected socket and emits one log per datagram.
+
+`bytes` remains the legacy single-stream total-output byte target. `event_size` is different: it sets the exact application bytes for each YAML stream event, including the terminal LF written after the serialized record. It does not change number, loop, EPS, duration, or legacy `bytes` behavior.
+
+`event_size` is validated before any configured stream starts. The minimum is format-specific: Apache common/common-log `95`, Apache combined `368`, Apache error `108`, RFC3164 `64`, RFC5424 `105`, CEF `225`, and JSON `329` bytes. RFC3164 has a hard maximum of `1024` bytes including the LF. Phase-one CEF resizes only the existing `msg` extension, so its supported range is `225..1225` bytes; the `msg` value remains within the OpenText CEF Implementation Standard Version 27 limit of 1023 bytes.
+
+isc4-flog applies a 1 MiB per-event safety limit for TCP and a 65507-byte UDP application-payload limit. These are isc4-flog product/transport policies, not RFC5424 message-size limits. RFC5424 has no general protocol-wide maximum. UDP path MTU and fragmentation often make smaller messages preferable; RFC5426 interoperability recommendations are receiver-support targets, not sender maxima. Receiver limits such as rsyslog `maxMessageSize` are receiver configuration and can still truncate or reject larger messages.
 
 CEF uses the same configuration fields. For example, save this as `flog.yaml` and run `./flog --config flog.yaml`:
 

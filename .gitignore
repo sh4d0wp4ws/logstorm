@@ -13,3 +13,7 @@ flog.exe
 # Config
 flog.yaml
 *.local.yaml
+
+# Backup
+*.backup
+*.bk

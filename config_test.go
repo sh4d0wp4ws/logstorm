@@ -42,6 +42,7 @@ streams:
 	assert.Equal(t, "127.0.0.1:514", streams[0].Option.Target)
 	assert.Equal(t, defaultOptions().Number, streams[0].Option.Number)
 	assert.Equal(t, defaultOptions().Delay, streams[0].Option.Delay)
+	assert.Equal(t, 0, streams[0].Option.EventSize)
 }
 
 func TestLoadStreamsAppliesExplicitNumberAndLoop(t *testing.T) {
@@ -237,6 +238,7 @@ func TestLoadStreamsRejectsInvalidConfiguration(t *testing.T) {
 		{"negative duration", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    duration: -1s\n"},
 		{"eps and delay", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    eps: 1\n    delay: 1s\n"},
 		{"eps and zero delay", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    eps: 1\n    delay: 0s\n"},
+		{"event size type", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n    event_size: nope\n"},
 		{"malformed scalar", "streams:\n  - name: apache\n    format: 123\n    type: udp\n    target: localhost:514\n"},
 		{"multiple documents", "streams:\n  - name: apache\n    format: apache_common\n    type: udp\n    target: localhost:514\n---\nstreams: []\n"},
 	}
