@@ -63,6 +63,13 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 	} else {
 		defer pacer.Cancel()
 	}
+	newLog := func() (string, error) {
+		timestamp := pacer.Timestamp(created)
+		if option.EventSize > 0 {
+			return NewSizedLog(option.Format, timestamp, option.EventSize)
+		}
+		return NewLog(option.Format, timestamp), nil
+	}
 
 	if option.Forever {
 		for {
@@ -71,7 +78,10 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 			} else if stopped {
 				return nil
 			}
-			log := NewLog(option.Format, pacer.Timestamp(created))
+			log, logErr := newLog()
+			if logErr != nil {
+				return logErr
+			}
 			if stopped, stopErr := pacer.Stopped(); stopErr != nil {
 				return stopErr
 			} else if stopped {
@@ -96,7 +106,10 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 			} else if stopped {
 				return nil
 			}
-			log := NewLog(option.Format, pacer.Timestamp(created))
+			log, logErr := newLog()
+			if logErr != nil {
+				return logErr
+			}
 			if stopped, stopErr := pacer.Stopped(); stopErr != nil {
 				return stopErr
 			} else if stopped {
@@ -138,7 +151,10 @@ func GenerateContext(ctx context.Context, option *Option) (err error) {
 			} else if stopped {
 				return nil
 			}
-			log := NewLog(option.Format, pacer.Timestamp(created))
+			log, logErr := newLog()
+			if logErr != nil {
+				return logErr
+			}
 			if stopped, stopErr := pacer.Stopped(); stopErr != nil {
 				return stopErr
 			} else if stopped {
@@ -239,6 +255,43 @@ func NewLog(format string, t time.Time) string {
 	default:
 		return ""
 	}
+}
+
+// NewSizedLog creates a format-valid log whose serialized bytes plus the
+// newline written by GenerateContext equal eventSize.
+func NewSizedLog(format string, t time.Time, eventSize int) (string, error) {
+	if err := validateSizedLogEventSize(format, eventSize); err != nil {
+		return "", err
+	}
+
+	var (
+		log string
+		err error
+	)
+	switch format {
+	case "apache_common":
+		log, err = newApacheCommonLog(t, eventSize)
+	case "apache_combined":
+		log, err = newApacheCombinedLog(t, eventSize)
+	case "apache_error":
+		log, err = newApacheErrorLog(t, eventSize)
+	case "rfc3164":
+		log, err = newRFC3164Log(t, eventSize)
+	case "rfc5424":
+		log, err = newRFC5424Log(t, eventSize)
+	case "cef":
+		log, err = newCEFLog(t, eventSize)
+	case "common_log":
+		log, err = newCommonLogFormat(t, eventSize)
+	case "json":
+		log, err = newJSONLogFormat(t, eventSize)
+	default:
+		return "", fmt.Errorf("%s is not a valid format", format)
+	}
+	if err != nil {
+		return "", err
+	}
+	return ensureEventSize(log, eventSize)
 }
 
 // NewSplitFileName creates a new file path with split count

@@ -19,6 +19,7 @@ Current custom functionality includes:
 - RFC3164, RFC5424, and CEF log formats
 - Per-stream EPS pacing
 - Duration-bounded streams
+- Exact per-stream event sizing in YAML configuration
 
 Treat `origin` as this project's repository and `upstream` as the original `mingrammer/flog` repository.
 

@@ -5,6 +5,7 @@ streams:
     target: 192.168.1.10:514
     number: 100
     eps: 25
+    event_size: 1024
 
   - name: apache-tcp
     format: apache_combined

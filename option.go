@@ -66,6 +66,7 @@ type Option struct {
 	Delay     time.Duration
 	EPS       int
 	Duration  time.Duration
+	EventSize int
 	SplitBy   int
 	Overwrite bool
 	Forever   bool

@@ -28,74 +28,158 @@ const (
 
 // NewApacheCommonLog creates a log string with apache common log format
 func NewApacheCommonLog(t time.Time) string {
+	log, _ := newApacheCommonLog(t, 0)
+	return log
+}
+
+func newApacheCommonLog(t time.Time, eventSize int) (string, error) {
+	address := gofakeit.IPv4Address()
+	user := RandAuthUserID()
+	method := gofakeit.HTTPMethod()
+	request := RandResourceURI()
+	protocol := RandHTTPVersion()
+	status := gofakeit.StatusCode()
+	bytes := gofakeit.Number(0, 30000)
+	if eventSize > 0 {
+		fixed := len(fmt.Sprintf(ApacheCommonLog, address, user, t.Format(Apache), method, "", protocol, status, bytes))
+		var err error
+		request, err = sizedRequest(eventSize, fixed)
+		if err != nil {
+			return "", err
+		}
+	}
 	return fmt.Sprintf(
 		ApacheCommonLog,
-		gofakeit.IPv4Address(),
-		RandAuthUserID(),
+		address,
+		user,
 		t.Format(Apache),
-		gofakeit.HTTPMethod(),
-		RandResourceURI(),
-		RandHTTPVersion(),
-		gofakeit.StatusCode(),
-		gofakeit.Number(0, 30000),
-	)
+		method,
+		request,
+		protocol,
+		status,
+		bytes,
+	), nil
 }
 
 // NewApacheCombinedLog creates a log string with apache combined log format
 func NewApacheCombinedLog(t time.Time) string {
+	log, _ := newApacheCombinedLog(t, 0)
+	return log
+}
+
+func newApacheCombinedLog(t time.Time, eventSize int) (string, error) {
+	address := gofakeit.IPv4Address()
+	user := RandAuthUserID()
+	method := gofakeit.HTTPMethod()
+	request := RandResourceURI()
+	protocol := RandHTTPVersion()
+	status := gofakeit.StatusCode()
+	bytes := gofakeit.Number(30, 100000)
+	referer := gofakeit.URL()
+	userAgent := gofakeit.UserAgent()
+	if eventSize > 0 {
+		fixed := len(fmt.Sprintf(ApacheCombinedLog, address, user, t.Format(Apache), method, "", protocol, status, bytes, referer, userAgent))
+		var err error
+		request, err = sizedRequest(eventSize, fixed)
+		if err != nil {
+			return "", err
+		}
+	}
 	return fmt.Sprintf(
 		ApacheCombinedLog,
-		gofakeit.IPv4Address(),
-		RandAuthUserID(),
+		address,
+		user,
 		t.Format(Apache),
-		gofakeit.HTTPMethod(),
-		RandResourceURI(),
-		RandHTTPVersion(),
-		gofakeit.StatusCode(),
-		gofakeit.Number(30, 100000),
-		gofakeit.URL(),
-		gofakeit.UserAgent(),
-	)
+		method,
+		request,
+		protocol,
+		status,
+		bytes,
+		referer,
+		userAgent,
+	), nil
 }
 
 // NewApacheErrorLog creates a log string with apache error log format
 func NewApacheErrorLog(t time.Time) string {
+	log, _ := newApacheErrorLog(t, 0)
+	return log
+}
+
+func newApacheErrorLog(t time.Time, eventSize int) (string, error) {
+	module := gofakeit.Word()
+	level := gofakeit.LogLevel("apache")
+	pid := gofakeit.Number(1, 10000)
+	tid := gofakeit.Number(1, 10000)
+	address := gofakeit.IPv4Address()
+	port := gofakeit.Number(1, 65535)
+	message := gofakeit.HackerPhrase()
+	if eventSize > 0 {
+		fixed := len(fmt.Sprintf(ApacheErrorLog, t.Format(ApacheError), module, level, pid, tid, address, port, ""))
+		var err error
+		message, err = sizedText(eventSize, fixed, 1, 0)
+		if err != nil {
+			return "", err
+		}
+	}
 	return fmt.Sprintf(
 		ApacheErrorLog,
 		t.Format(ApacheError),
-		gofakeit.Word(),
-		gofakeit.LogLevel("apache"),
-		gofakeit.Number(1, 10000),
-		gofakeit.Number(1, 10000),
-		gofakeit.IPv4Address(),
-		gofakeit.Number(1, 65535),
-		gofakeit.HackerPhrase(),
-	)
+		module,
+		level,
+		pid,
+		tid,
+		address,
+		port,
+		message,
+	), nil
 }
 
 // NewRFC3164Log creates a log string with syslog (RFC3164) format
 func NewRFC3164Log(t time.Time) string {
-	return formatRFC3164(
-		gofakeit.Number(0, 191),
-		t,
-		strings.ToLower(gofakeit.Username()),
-		gofakeit.Word(),
-		gofakeit.Number(1, 10000),
-		gofakeit.HackerPhrase(),
-	)
+	log, _ := newRFC3164Log(t, 0)
+	return log
+}
+
+func newRFC3164Log(t time.Time, eventSize int) (string, error) {
+	priority := gofakeit.Number(0, 191)
+	host := strings.ToLower(gofakeit.Username())
+	tag := gofakeit.Word()
+	pid := gofakeit.Number(1, 10000)
+	message := gofakeit.HackerPhrase()
+	if eventSize > 0 {
+		fixed := len(formatRFC3164(priority, t, host, tag, pid, ""))
+		var err error
+		message, err = sizedText(eventSize, fixed, 1, 1023-fixed)
+		if err != nil {
+			return "", err
+		}
+	}
+	return formatRFC3164(priority, t, host, tag, pid, message), nil
 }
 
 // NewRFC5424Log creates a log string with syslog (RFC5424) format
 func NewRFC5424Log(t time.Time) string {
-	return formatRFC5424(
-		gofakeit.Number(0, 191),
-		t,
-		gofakeit.DomainName(),
-		gofakeit.Word(),
-		strconv.Itoa(gofakeit.Number(1, 10000)),
-		fmt.Sprintf("ID%d", gofakeit.Number(1, 1000)),
-		visibleASCII(gofakeit.HackerPhrase()),
-	)
+	log, _ := newRFC5424Log(t, 0)
+	return log
+}
+
+func newRFC5424Log(t time.Time, eventSize int) (string, error) {
+	priority := gofakeit.Number(0, 191)
+	host := gofakeit.DomainName()
+	app := gofakeit.Word()
+	proc := strconv.Itoa(gofakeit.Number(1, 10000))
+	messageID := fmt.Sprintf("ID%d", gofakeit.Number(1, 1000))
+	message := visibleASCII(gofakeit.HackerPhrase())
+	if eventSize > 0 {
+		fixed := len(formatRFC5424(priority, t, host, app, proc, messageID, ""))
+		var err error
+		message, err = sizedText(eventSize, fixed, 1, 0)
+		if err != nil {
+			return "", err
+		}
+	}
+	return formatRFC5424(priority, t, host, app, proc, messageID, message), nil
 }
 
 func formatRFC3164(priority int, t time.Time, host, tag string, pid int, message string) string {
@@ -178,13 +262,33 @@ func visibleASCII(value string) string {
 
 // NewCEFLog creates a synthetic CEF:0 event in the MSG of an RFC5424 envelope.
 func NewCEFLog(t time.Time) string {
+	log, _ := newCEFLog(t, 0)
+	return log
+}
+
+func newCEFLog(t time.Time, eventSize int) (string, error) {
 	header := []string{"CEF:0", "isc4", "flog", version, "1001", "Synthetic network connection allowed", "5"}
 	for i := 1; i < len(header); i++ {
 		header[i] = escapeCEFHeader(header[i])
 	}
+	source := gofakeit.IPv4Address()
+	destination := gofakeit.IPv4Address()
+	sourcePort := gofakeit.Number(1024, 65535)
+	message := "Synthetic network connection allowed"
+	if eventSize > 0 {
+		fixed := len(formatCEFLog(t, header, source, destination, sourcePort, ""))
+		var err error
+		message, err = sizedText(eventSize, fixed, 1, 1023)
+		if err != nil {
+			return "", err
+		}
+	}
+	return formatCEFLog(t, header, source, destination, sourcePort, message), nil
+}
+
+func formatCEFLog(t time.Time, header []string, source, destination string, sourcePort int, message string) string {
 	extension := fmt.Sprintf("src=%s dst=%s spt=%d dpt=443 proto=TCP act=allowed msg=%s",
-		gofakeit.IPv4Address(), gofakeit.IPv4Address(), gofakeit.Number(1024, 65535),
-		escapeCEFExtension("Synthetic network connection allowed"))
+		source, destination, sourcePort, escapeCEFExtension(message))
 	// local4.warning (20*8+4) is independent of the CEF Severity header value 5.
 	return formatRFC5424(164, t, "isc4-flog.example", "isc4-flog", "-", "CEF", strings.Join(header, "|")+"|"+extension)
 }
@@ -199,31 +303,72 @@ func escapeCEFExtension(value string) string {
 
 // NewCommonLogFormat creates a log string with common log format
 func NewCommonLogFormat(t time.Time) string {
+	log, _ := newCommonLogFormat(t, 0)
+	return log
+}
+
+func newCommonLogFormat(t time.Time, eventSize int) (string, error) {
+	address := gofakeit.IPv4Address()
+	user := RandAuthUserID()
+	method := gofakeit.HTTPMethod()
+	request := RandResourceURI()
+	protocol := RandHTTPVersion()
+	status := gofakeit.StatusCode()
+	bytes := gofakeit.Number(0, 30000)
+	if eventSize > 0 {
+		fixed := len(fmt.Sprintf(CommonLogFormat, address, user, t.Format(CommonLog), method, "", protocol, status, bytes))
+		var err error
+		request, err = sizedRequest(eventSize, fixed)
+		if err != nil {
+			return "", err
+		}
+	}
 	return fmt.Sprintf(
 		CommonLogFormat,
-		gofakeit.IPv4Address(),
-		RandAuthUserID(),
+		address,
+		user,
 		t.Format(CommonLog),
-		gofakeit.HTTPMethod(),
-		RandResourceURI(),
-		RandHTTPVersion(),
-		gofakeit.StatusCode(),
-		gofakeit.Number(0, 30000),
-	)
+		method,
+		request,
+		protocol,
+		status,
+		bytes,
+	), nil
 }
 
 // NewJSONLogFormat creates a log string with json log format
 func NewJSONLogFormat(t time.Time) string {
+	log, _ := newJSONLogFormat(t, 0)
+	return log
+}
+
+func newJSONLogFormat(t time.Time, eventSize int) (string, error) {
+	address := gofakeit.IPv4Address()
+	user := RandAuthUserID()
+	method := gofakeit.HTTPMethod()
+	request := RandResourceURI()
+	protocol := RandHTTPVersion()
+	status := gofakeit.StatusCode()
+	bytes := gofakeit.Number(0, 30000)
+	referer := gofakeit.URL()
+	if eventSize > 0 {
+		fixed := len(fmt.Sprintf(JSONLogFormat, address, user, t.Format(CommonLog), method, "", protocol, status, bytes, referer))
+		var err error
+		request, err = sizedRequest(eventSize, fixed)
+		if err != nil {
+			return "", err
+		}
+	}
 	return fmt.Sprintf(
 		JSONLogFormat,
-		gofakeit.IPv4Address(),
-		RandAuthUserID(),
+		address,
+		user,
 		t.Format(CommonLog),
-		gofakeit.HTTPMethod(),
-		RandResourceURI(),
-		RandHTTPVersion(),
-		gofakeit.StatusCode(),
-		gofakeit.Number(0, 30000),
-		gofakeit.URL(),
-	)
+		method,
+		request,
+		protocol,
+		status,
+		bytes,
+		referer,
+	), nil
 }

@@ -27,15 +27,16 @@ type Config struct {
 }
 
 type StreamConfig struct {
-	Name     strictString  `yaml:"name"`
-	Format   strictString  `yaml:"format"`
-	Type     strictString  `yaml:"type"`
-	Target   strictString  `yaml:"target"`
-	Number   *int          `yaml:"number"`
-	Loop     bool          `yaml:"loop"`
-	Delay    *strictString `yaml:"delay"`
-	EPS      *int          `yaml:"eps"`
-	Duration *strictString `yaml:"duration"`
+	Name      strictString  `yaml:"name"`
+	Format    strictString  `yaml:"format"`
+	Type      strictString  `yaml:"type"`
+	Target    strictString  `yaml:"target"`
+	Number    *int          `yaml:"number"`
+	Loop      bool          `yaml:"loop"`
+	Delay     *strictString `yaml:"delay"`
+	EPS       *int          `yaml:"eps"`
+	Duration  *strictString `yaml:"duration"`
+	EventSize *int          `yaml:"event_size"`
 }
 
 type Stream struct {
@@ -145,6 +146,12 @@ func (streamConfig StreamConfig) stream() (Stream, error) {
 		if option.Duration, err = parseDuration(string(*streamConfig.Duration)); err != nil {
 			return Stream{}, fmt.Errorf("stream %q: invalid duration: %w", name, err)
 		}
+	}
+	if streamConfig.EventSize != nil {
+		if err := validateEventSize(option.Format, option.Type, *streamConfig.EventSize); err != nil {
+			return Stream{}, fmt.Errorf("stream %q: %w", name, err)
+		}
+		option.EventSize = *streamConfig.EventSize
 	}
 	option.Forever = streamConfig.Loop || (streamConfig.Duration != nil && streamConfig.Number == nil)
 	return Stream{Name: name, Option: option}, nil
