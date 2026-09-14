@@ -96,6 +96,23 @@ func TestRunStreamsDoesNotStopOtherStreamsAfterFiniteCompletion(t *testing.T) {
 	readUDPDatagrams(t, listener, 3)
 }
 
+func TestRunStreamsDoesNotStopHealthyPeerAfterDurationCompletion(t *testing.T) {
+	listener, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer listener.Close()
+
+	streams := []Stream{
+		{Name: "duration", Option: &Option{Format: "apache_common", Type: "udp", Target: listener.LocalAddr().String(), Forever: true, EPS: 1, Duration: 25 * time.Millisecond}},
+		{Name: "healthy", Option: &Option{Format: "apache_common", Type: "udp", Target: listener.LocalAddr().String(), Number: 2, Delay: 50 * time.Millisecond}},
+	}
+	if !assert.NoError(t, RunStreams(context.Background(), streams)) {
+		return
+	}
+	readUDPDatagrams(t, listener, 3)
+}
+
 func TestRunStreamsCancelsPeersAndReturnsNamedFailure(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if !assert.NoError(t, err) {
@@ -107,7 +124,7 @@ func TestRunStreamsCancelsPeersAndReturnsNamedFailure(t *testing.T) {
 	started := time.Now()
 	err = RunStreams(context.Background(), []Stream{
 		{Name: "broken", Option: &Option{Format: "apache_common", Type: "tcp", Target: target, Number: 1}},
-		{Name: "waiting", Option: &Option{Format: "apache_common", Type: "udp", Target: "127.0.0.1:9", Number: 1, Delay: time.Hour}},
+		{Name: "waiting", Option: &Option{Format: "apache_common", Type: "udp", Target: "127.0.0.1:9", Forever: true, EPS: 1, Duration: time.Hour}},
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), `stream "broken"`)
@@ -142,7 +159,7 @@ func TestCancellationCloseOnlyClosesWriterOnce(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	writer := &countingWriter{}
 	ownedWriter := &closeOnceWriter{WriteCloser: writer}
-	stop := closeOnCancellation(ctx, ownedWriter)
+	stop := closeOnCancellation(ctx, ownedWriter, nil)
 	cancel()
 	stop()
 	assert.NoError(t, ownedWriter.Close())

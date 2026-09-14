@@ -4,11 +4,12 @@ streams:
     type: udp
     target: 192.168.1.10:514
     number: 100
-    delay: 1s
+    eps: 25
 
   - name: apache-tcp
     format: apache_combined
     type: tcp
     target: 192.168.1.10:515
-    number: 100
-    delay: 1s
+    loop: true
+    eps: 10
+    duration: 30s

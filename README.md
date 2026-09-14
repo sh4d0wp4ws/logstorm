@@ -16,6 +16,7 @@ Use it to produce a selected log format for stdout, a file, a gzip file, or one 
 - Optional YAML configuration for concurrent TCP and UDP streams
 - Finite generation by line count or byte count
 - Continuous generation with `--loop`
+- EPS pacing and duration-bounded YAML streams
 - File splitting for plain and gzip file outputs
 
 ## Supported Log Formats
@@ -152,14 +153,15 @@ streams:
     type: udp
     target: 192.168.1.10:514
     number: 100
-    delay: 1s
+    eps: 25
 
   - name: apache-tcp
     format: apache_combined
     type: tcp
     target: 192.168.1.10:515
     loop: true
-    delay: 500ms
+    eps: 10
+    duration: 30s
 ```
 
 Run it with:
@@ -168,9 +170,11 @@ Run it with:
 ./flog --config flog.yaml
 ```
 
-The required fields are `name`, `format`, `type`, and `target`. The optional fields are `number`, `loop`, and `delay`. `type` must be `tcp` or `udp`; `target` must be a valid `host:port` destination. When both `number` and `loop` are omitted, the existing default finite count (`1000`) is used. `number` and `loop: true` cannot be specified together. The complete file is validated before any stream starts.
+The required fields are `name`, `format`, `type`, and `target`. The optional fields are `number`, `loop`, `delay`, `eps`, and `duration`. `type` must be `tcp` or `udp`; `target` must be a valid `host:port` destination. `eps` is a positive integer target rate in events per second and cannot be combined with `delay`, including `delay: 0s`. `duration` is a positive Go duration such as `10s`, `30s`, or `1m`; it starts after the stream writer or network connection has been initialized.
 
-If one stream has a connection or write error, isc4-flog stops the remaining streams and reports the failing stream name. Ctrl+C stops all active streams cleanly. TCP connections are still one-per-stream and reused; each UDP stream uses its own connected socket and emits one log per datagram.
+When both `number` and `loop` are omitted, the existing default finite count (`1000`) is used. When `duration` is present and both `number` and `loop` are omitted, the stream runs continuously until its duration expires instead. `number` and `loop: true` cannot be specified together. A stream stops when its applicable count or duration limit is reached first. The first EPS event is scheduled immediately, and later events remain anchored to the planned EPS timeline rather than accumulating generation or write time. In EPS mode, the generated log timestamp is that planned event time. The complete file is validated before any stream starts.
+
+Duration expiry is normal stream completion and does not stop other healthy streams. If one stream has a connection or write error, isc4-flog stops the remaining streams and reports the failing stream name. Ctrl+C stops all active streams cleanly. TCP connections are still one-per-stream and reused; each UDP stream uses its own connected socket and emits one log per datagram.
 
 CEF uses the same configuration fields. For example, save this as `flog.yaml` and run `./flog --config flog.yaml`:
 

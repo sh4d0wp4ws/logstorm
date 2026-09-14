@@ -64,6 +64,8 @@ type Option struct {
 	Bytes     int
 	Sleep     time.Duration
 	Delay     time.Duration
+	EPS       int
+	Duration  time.Duration
 	SplitBy   int
 	Overwrite bool
 	Forever   bool
